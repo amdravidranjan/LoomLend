@@ -70,7 +70,7 @@ function weekday(offset: number, hour: number, now: number) {
 
 export async function seedDemo() {
   const now = Date.now();
-  for (const t of [schema.auditLog, schema.notifications, schema.incidents, schema.bookings, schema.resources, schema.certifications, schema.users]) {
+  for (const t of [schema.handoverCodes, schema.allocationRounds, schema.fairnessCredits, schema.incidentStatements, schema.auditLog, schema.notifications, schema.incidents, schema.bookings, schema.resources, schema.certifications, schema.users]) {
     await db.delete(t);
   }
 

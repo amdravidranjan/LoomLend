@@ -52,6 +52,14 @@ export const resources = sqliteTable("resources", {
   usageRules: text("usage_rules").notNull(),
   autoApprove: integer("auto_approve", { mode: "boolean" }).notNull().default(false),
   status: text("status").$type<"active" | "maintenance" | "retired">().notNull().default("active"),
+  // Physical handover: secret encoded in the printed QR tag stuck on the item / door.
+  qrSecret: text("qr_secret").notNull().default(""),
+  // Impact: what renting an equivalent outside campus would cost per hour (₹), and purchase price.
+  marketRatePerHour: integer("market_rate_per_hour").notNull().default(0),
+  purchaseValue: integer("purchase_value").notNull().default(0),
+  // Allocation: first-come review, or periodic weighted-lottery rounds for high-demand resources.
+  allocationMode: text("allocation_mode").$type<"review" | "rounds">().notNull().default("review"),
+  roundLeadHours: integer("round_lead_hours").notNull().default(24), // requests for a day close this many hours before it starts
   createdAt: integer("created_at").notNull(),
 });
 
@@ -93,6 +101,11 @@ export const bookings = sqliteTable(
     returnConfirmedBy: text("return_confirmed_by"),
     remindedAt: integer("reminded_at"),
     overdueNotifiedAt: integer("overdue_notified_at"),
+    // How presence was proven at hand-over: scanned the item's QR tag, staff one-time code, or manual staff entry.
+    checkOutMethod: text("check_out_method").$type<"qr" | "staff_code" | "staff_manual">(),
+    returnMethod: text("return_method").$type<"qr" | "staff_code" | "staff_manual">(),
+    aiConditionDiff: text("ai_condition_diff"), // JSON: vision comparison of check-in vs return photos (advisory)
+    roundId: text("round_id"), // set when the booking was requested into an allocation round
     createdAt: integer("created_at").notNull(),
   },
   (t) => [index("bookings_resource_idx").on(t.resourceId), index("bookings_user_idx").on(t.userId)],
@@ -149,9 +162,60 @@ export const auditLog = sqliteTable(
   (t) => [index("audit_entity_idx").on(t.entityId), index("audit_booking_idx").on(t.bookingId)],
 );
 
+// Short-lived codes a staff member reads out to co-sign a supervised hand-over.
+export const handoverCodes = sqliteTable("handover_codes", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  staffId: text("staff_id").notNull(),
+  purpose: text("purpose").$type<"check_out" | "return">().notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+// Weighted lottery rounds for high-demand resources (commit-reveal, publicly verifiable).
+export const allocationRounds = sqliteTable("allocation_rounds", {
+  id: text("id").primaryKey(),
+  resourceId: text("resource_id").notNull(),
+  dayStart: integer("day_start").notNull(), // campus midnight of the day being allocated
+  closesAt: integer("closes_at").notNull(),
+  status: text("status").$type<"open" | "drawn">().notNull().default("open"),
+  seedCommitment: text("seed_commitment").notNull(), // sha256(seed), published while open
+  seed: text("seed"), // revealed at draw
+  results: text("results"), // JSON draw log
+  drawnAt: integer("drawn_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+// Fairness credit: people who lose a draw get a boost next time on that resource.
+export const fairnessCredits = sqliteTable("fairness_credits", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  resourceId: text("resource_id").notNull(),
+  credits: integer("credits").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+// Two-sided incidents: borrower (and others involved) add their side before a manager decides.
+export const incidentStatements = sqliteTable("incident_statements", {
+  id: text("id").primaryKey(),
+  incidentId: text("incident_id").notNull(),
+  userId: text("user_id").notNull(),
+  role: text("role").$type<"borrower" | "owner" | "manager" | "witness">().notNull(),
+  body: text("body").notNull(),
+  photo: text("photo"),
+  createdAt: integer("created_at").notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type Resource = typeof resources.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type Incident = typeof incidents.$inferSelect;
 export type Certification = typeof certifications.$inferSelect;
 export type AuditEntry = typeof auditLog.$inferSelect;
+export type HandoverCode = typeof handoverCodes.$inferSelect;
+export type AllocationRound = typeof allocationRounds.$inferSelect;
+export type FairnessCredit = typeof fairnessCredits.$inferSelect;
+export type IncidentStatement = typeof incidentStatements.$inferSelect;

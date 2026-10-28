@@ -19,7 +19,8 @@ const resource = (o: Partial<Resource> = {}): Resource => ({
   id: "r1", ownerId: "o1", name: "Laser Cutter", category: "equipment", description: "laser cutter", location: "M-104", department: "Mechanical",
   emoji: "🔥", tags: "laser,cut,acrylic", requiredCerts: '["laser-cutter"]', requiresIdVerified: true, allowedAffiliations: '["student","staff"]',
   supervisionRequired: true, depositRequired: 0, openHour: 10, closeHour: 17, openDays: "[1,2,3,4,5]", maxHours: 2, weeklyHourCap: 4,
-  usageRules: "rules", autoApprove: false, status: "active", createdAt: 0, ...o,
+  usageRules: "rules", autoApprove: false, status: "active", qrSecret: "s", marketRatePerHour: 0, purchaseValue: 0,
+  allocationMode: "review", roundLeadHours: 24, createdAt: 0, ...o,
 });
 const cert = (status: Certification["status"]): Certification => ({
   id: "c1", userId: "u1", certKey: "laser-cutter", evidence: "x", status, reviewedBy: null, reviewNote: null, createdAt: 0, reviewedAt: null,
@@ -28,7 +29,8 @@ const booking = (o: Partial<Booking>): Booking => ({
   id: crypto.randomUUID(), resourceId: "r1", userId: "u1", start: at(10), end: at(12), purpose: "p", purposeType: "coursework", status: "approved",
   decisionReason: null, decidedBy: null, eligibilitySnapshot: "{}", priorityScore: 0, priorityBreakdown: "[]", aiReview: null,
   checkOutAt: null, checkOutCondition: null, checkOutNotes: null, checkOutPhoto: null, returnAt: null, returnCondition: null, returnNotes: null,
-  returnPhoto: null, returnConfirmedBy: null, remindedAt: null, overdueNotifiedAt: null, createdAt: 0, ...o,
+  returnPhoto: null, returnConfirmedBy: null, remindedAt: null, overdueNotifiedAt: null, checkOutMethod: null, returnMethod: null,
+  aiConditionDiff: null, roundId: null, createdAt: 0, ...o,
 });
 const failing = (checks: { key: string; pass: boolean }[]) => checks.filter((c) => !c.pass).map((c) => c.key);
 
