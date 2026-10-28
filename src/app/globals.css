@@ -1,26 +1,80 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f7f4ee;
+  --card: #fffdf9;
+  --ink: #1f1d2b;
+  --muted: #6b6878;
+  --line: #e4ded3;
+  --thread: #4338ca; /* indigo warp */
+  --thread-soft: #e0e7ff;
+  --saffron: #c2410c; /* weft */
+  --saffron-soft: #ffedd5;
+  --teal: #0f766e;
+  --teal-soft: #ccfbf1;
+  --rose: #be123c;
+  --rose-soft: #ffe4e6;
+  --amber-soft: #fef3c7;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-thread: var(--thread);
+  --color-thread-soft: var(--thread-soft);
+  --color-saffron: var(--saffron);
+  --color-saffron-soft: var(--saffron-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
+  --color-amber-soft: var(--amber-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-fraunces);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* A faint woven texture: warp and weft lines. */
+.weave {
+  background-image:
+    repeating-linear-gradient(90deg, rgb(67 56 202 / 0.07) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(0deg, rgb(194 65 12 / 0.06) 0 1px, transparent 1px 14px);
+}
+
+.card {
+  @apply rounded-xl border border-line bg-card;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-thread;
+}
+@utility btn-primary {
+  @apply btn bg-thread text-white hover:bg-indigo-800;
+}
+@utility btn-ghost {
+  @apply btn border border-line bg-card text-ink hover:bg-paper;
+}
+@utility btn-danger {
+  @apply btn bg-rose text-white hover:bg-rose-800;
+}
+@utility btn-ok {
+  @apply btn bg-teal text-white hover:bg-teal-800;
+}
+
+.input {
+  @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-thread focus:outline-2 focus:outline-thread-soft;
+}
+.label {
+  @apply mb-1 block text-xs font-semibold tracking-wide text-muted uppercase;
+}
+.h-display {
+  font-family: var(--font-display), Georgia, serif;
 }
