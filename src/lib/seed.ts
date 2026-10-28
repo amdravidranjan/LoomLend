@@ -5,6 +5,7 @@ import type { Booking } from "@/db/schema";
 import { audit } from "./audit";
 import { priorityScore } from "./rules";
 import { ruleRequestNote } from "./ai";
+import { seedExtras } from "./seed-extras";
 import { DAY, HOUR, campusDayAt, campusParts } from "./time";
 
 // Entirely fictional demo data for "Northfield Institute of Technology".
@@ -261,5 +262,6 @@ export async function seedDemo() {
   await n("u-nisha", "incident", "Incident on Mirrorless Camera Kit", "damage · medium severity. Needs human review.", "/incidents/i-camera", 3 * DAY);
   await n("u-arun", "review", "Training record to verify", "Arjun Kumar submitted Laser Cutter Operator.", "/admin", 3 * DAY);
 
+  await seedExtras(now);
   await audit({ actorId: null, action: "system.reset", entityType: "system", entityId: "seed", details: { note: "Demo data loaded" } });
 }
