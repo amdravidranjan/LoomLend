@@ -6,6 +6,7 @@ import { audit } from "./audit";
 import { conditionLabel } from "./catalog";
 import { reportIncident } from "./workflow";
 import type { ConditionDiff, VisionResult } from "./vision-types";
+import { aiKeySource, anthropicClient } from "./ai-key";
 
 // Advisory photo comparison: Claude looks at the check-in and return photos and lists visible
 // changes. It never decides anything. If it thinks a damage review is warranted and none exists,
@@ -14,10 +15,8 @@ import type { ConditionDiff, VisionResult } from "./vision-types";
 
 const MODEL = "claude-opus-5-5";
 const TIMEOUT_MS = 30_000;
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: TIMEOUT_MS, maxRetries: 1 }) : null;
-
-export function visionEnabled() {
-  return client !== null;
+export async function visionEnabled() {
+  return (await aiKeySource()) !== "none";
 }
 
 const SCHEMA = {
@@ -75,7 +74,7 @@ async function save(bookingId: string, diff: ConditionDiff) {
   await db.update(schema.bookings).set({ aiConditionDiff: JSON.stringify(diff) }).where(eq(schema.bookings.id, bookingId));
 }
 
-async function askClaude(before: string, after: string, context: string): Promise<{ ok: true; result: VisionResult } | { ok: false; message: string }> {
+async function askClaude(client: Anthropic | null, before: string, after: string, context: string): Promise<{ ok: true; result: VisionResult } | { ok: false; message: string }> {
   if (!client) return { ok: false, message: "No API key configured." };
   const a = toImageBlock(before);
   const b = toImageBlock(after);
@@ -135,8 +134,10 @@ async function askClaude(before: string, after: string, context: string): Promis
  * Compare the check-in and return photos of a booking and store the advisory result.
  * Safe to call more than once (a retry overwrites the previous result). Never throws.
  */
-export async function compareConditionPhotos(bookingId: string): Promise<ConditionDiff | null> {
+/** `apiKey` must be resolved by the caller when this runs after the response (no request cookies there). */
+export async function compareConditionPhotos(bookingId: string, apiKey?: string | null): Promise<ConditionDiff | null> {
   try {
+    const client = await anthropicClient({ timeout: TIMEOUT_MS, maxRetries: 1, apiKey });
     const b = await db.query.bookings.findFirst({ where: eq(schema.bookings.id, bookingId) });
     if (!b || !b.checkOutPhoto || !b.returnPhoto) return null;
     const now = Date.now();
@@ -154,7 +155,7 @@ export async function compareConditionPhotos(bookingId: string): Promise<Conditi
       `Item: ${r?.name ?? "equipment"}. Borrower recorded condition at check-in: ${conditionLabel(b.checkOutCondition)}` +
       `${b.checkOutNotes ? ` ("${b.checkOutNotes.slice(0, 200)}")` : ""}; at return: ${conditionLabel(b.returnCondition)}` +
       `${b.returnNotes ? ` ("${b.returnNotes.slice(0, 200)}")` : ""}.`;
-    const out = await askClaude(b.checkOutPhoto, b.returnPhoto, context);
+    const out = await askClaude(client, b.checkOutPhoto, b.returnPhoto, context);
     if (!out.ok) {
       const diff: ConditionDiff = { status: "error", message: out.message, at: Date.now(), attempts };
       await save(b.id, diff);

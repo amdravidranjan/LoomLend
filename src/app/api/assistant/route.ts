@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
+import { resolveApiKey } from "@/lib/ai-key";
 import { currentTime } from "@/lib/time";
 import { runBasic } from "@/lib/assistant-basic";
 import { ClaudeUnavailable, claudeAvailable, runClaude } from "@/lib/assistant-claude";
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
   const history = body.history.slice(-12).map((t) => ({ ...t, content: t.content.slice(0, 2000) }));
 
   const encoder = new TextEncoder();
+  const { key: apiKey } = await resolveApiKey();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
@@ -69,10 +71,10 @@ export async function POST(request: Request) {
       };
       const ctx: ToolContext = { user, now, purpose: body.message };
       try {
-        if (claudeAvailable()) {
+        if (claudeAvailable(apiKey)) {
           try {
             emit({ type: "mode", mode: "claude" });
-            const out = await runClaude(ctx, history, body.message, emit, request.signal);
+            const out = await runClaude(ctx, history, body.message, emit, request.signal, apiKey);
             if (out.cards.length) emit({ type: "options", options: out.cards });
             emit({ type: "followups", items: out.followups });
           } catch (err) {

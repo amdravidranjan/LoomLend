@@ -110,7 +110,7 @@ export default async function IncidentPage({ params }: PageProps<"/incidents/[id
                 diff={parseDiff(b.aiConditionDiff)}
                 bookingId={b.id}
                 canRetry={staff || isBorrower}
-                aiConfigured={visionEnabled()}
+                aiConfigured={(await visionEnabled())}
                 staleMs={STALE_PENDING_MS}
                 now={now}
               />

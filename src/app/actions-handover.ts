@@ -10,6 +10,7 @@ import { canManageResource, requireUser } from "@/lib/auth";
 import * as wf from "@/lib/workflow";
 import * as ho from "@/lib/handover";
 import { compareConditionPhotos, parseDiff, visionEnabled } from "@/lib/vision";
+import { resolveApiKey } from "@/lib/ai-key";
 import { STALE_PENDING_MS } from "@/lib/vision-types";
 import type { FormState } from "@/app/actions";
 import type { CodeState } from "@/lib/handover-state";
@@ -55,7 +56,11 @@ export async function handoverAction(_: FormState, fd: FormData): Promise<FormSt
   });
   if (res?.error) return res;
   // The photo comparison can take a few seconds: run it after the response is sent.
-  if (compare) after(() => compareConditionPhotos(bookingId));
+  if (compare) {
+    // Resolve the key now: request cookies aren't available once the response has been sent.
+    const { key } = await resolveApiKey();
+    after(() => compareConditionPhotos(bookingId, key));
+  }
   redirect(`/bookings/${bookingId}?handover=${purpose === "check_out" ? "checked_in" : "returned"}`);
 }
 
@@ -82,7 +87,7 @@ export async function retryComparisonAction(_: FormState, fd: FormData): Promise
     const r = (await db.query.resources.findFirst({ where: eq(schema.resources.id, b.resourceId) }))!;
     if (b.userId !== user.id && !canManageResource(user, r)) throw new wf.WorkflowError("Not allowed.");
     if (!b.checkOutPhoto || !b.returnPhoto) throw new wf.WorkflowError("Both a check-in and a return photo are needed to compare.");
-    if (!visionEnabled()) throw new wf.WorkflowError("AI comparison is not configured on this server. The rough pixel check below still works.");
+    if (!(await visionEnabled())) throw new wf.WorkflowError("No Claude API key is set. Add your own on the AI key page, or use the rough pixel check below.");
     const prev = parseDiff(b.aiConditionDiff);
     if (prev?.status === "pending" && Date.now() - prev.requestedAt < STALE_PENDING_MS) throw new wf.WorkflowError("A comparison is already running. Give it a few seconds, then reload.");
     const out = await compareConditionPhotos(b.id);

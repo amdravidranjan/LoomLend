@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { aiKeySource, anthropicClient } from "./ai-key";
 
 // AI is advisory only: it writes a short note for the human reviewer. It never approves,
 // rejects or penalises anyone. Without an API key (or on any error) a rule-based note is used.
@@ -12,7 +13,7 @@ export type AdvisoryNote = {
 };
 
 const MODEL = "claude-opus-5-5";
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
+
 
 const NOTE_SCHEMA = {
   type: "object",
@@ -26,6 +27,7 @@ const NOTE_SCHEMA = {
 } as const;
 
 async function askClaude(system: string, content: string): Promise<AdvisoryNote | null> {
+  const client = await anthropicClient({ timeout: 20_000, maxRetries: 1 });
   if (!client) return null;
   try {
     const response = await client.messages.create({
@@ -120,6 +122,6 @@ export async function summarizeIncident(c: IncidentContext): Promise<AdvisoryNot
   return ai ?? ruleIncidentNote(c);
 }
 
-export function aiEnabled() {
-  return client !== null;
+export async function aiEnabled() {
+  return (await aiKeySource()) !== "none";
 }

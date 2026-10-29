@@ -40,7 +40,7 @@ function simulatedIn(history: AuditEntry[], action: string) {
 }
 
 /** Condition record with proof-of-presence badges and the before/after comparison. */
-export function ConditionRecordSection({ b, history, canRetry, now }: { b: Booking; history: AuditEntry[]; canRetry: boolean; now: number }) {
+export async function ConditionRecordSection({ b, history, canRetry, now }: { b: Booking; history: AuditEntry[]; canRetry: boolean; now: number }) {
   if (!b.checkOutAt && !b.returnAt) return null;
   const rows = [
     { title: "At check-in", at: b.checkOutAt, cond: b.checkOutCondition, notes: b.checkOutNotes, photo: b.checkOutPhoto, method: b.checkOutMethod, sim: simulatedIn(history, "booking.checked_out") },
@@ -79,7 +79,7 @@ export function ConditionRecordSection({ b, history, canRetry, now }: { b: Booki
             diff={parseDiff(b.aiConditionDiff)}
             bookingId={b.id}
             canRetry={canRetry}
-            aiConfigured={visionEnabled()}
+            aiConfigured={(await visionEnabled())}
             staleMs={STALE_PENDING_MS}
             now={now}
           />

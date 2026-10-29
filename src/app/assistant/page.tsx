@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { verifiedCertKeys } from "@/lib/assistant";
 import { claudeAvailable } from "@/lib/assistant-claude";
+import { resolveApiKey } from "@/lib/ai-key";
+import { AiKeyBanner } from "@/components/ai-key-banner";
 import { Chat } from "./chat";
 
 export const metadata: Metadata = { title: "Ask · LoomLend" };
@@ -30,12 +32,18 @@ export default async function AssistantPage() {
   }
   prompts.push("What have I booked?", "How does the waiting list work?");
 
+  const { key } = await resolveApiKey();
   return (
-    <Chat
-      storageKey={`ll-assistant:${user.id}`}
-      firstName={user.name.replace(/^Dr\.\s*/, "").split(" ")[0]}
-      claude={claudeAvailable()}
-      suggestions={[...new Set(prompts)].slice(0, 6)}
-    />
+    <>
+      <div className="mx-auto max-w-3xl">
+        <AiKeyBanner />
+      </div>
+      <Chat
+        storageKey={`ll-assistant:${user.id}`}
+        firstName={user.name.replace(/^Dr\.\s*/, "").split(" ")[0]}
+        claude={claudeAvailable(key)}
+        suggestions={[...new Set(prompts)].slice(0, 6)}
+      />
+    </>
   );
 }

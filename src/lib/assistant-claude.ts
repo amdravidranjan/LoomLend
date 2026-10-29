@@ -16,10 +16,10 @@ import { CAMPUS_TZ } from "./time";
 
 const MODEL = "claude-opus-5-5";
 const MAX_ROUNDS = 6;
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 60_000, maxRetries: 2 }) : null;
-
-export function claudeAvailable() {
-  return client !== null;
+// The key comes from the deployment or the visitor (see ai-key.ts); the route resolves it before
+// streaming starts, because request cookies may not be readable inside the stream.
+export function claudeAvailable(apiKey: string | null) {
+  return Boolean(apiKey);
 }
 
 /** Thrown before any text reached the user, so the route can fall back to basic mode cleanly. */
@@ -138,8 +138,9 @@ function toMessages(history: ChatTurn[], message: string): Anthropic.Beta.BetaMe
   return out;
 }
 
-export async function runClaude(ctx: ToolContext, history: ChatTurn[], message: string, emit: (e: StreamEvent) => void, signal?: AbortSignal) {
-  if (!client) throw new ClaudeUnavailable("No API key configured", "auth");
+export async function runClaude(ctx: ToolContext, history: ChatTurn[], message: string, emit: (e: StreamEvent) => void, signal: AbortSignal | undefined, apiKey: string | null) {
+  if (!apiKey) throw new ClaudeUnavailable("No API key configured", "auth");
+  const client = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
   const profile = await requesterProfile(ctx.user, ctx.now);
   const nowText = new Intl.DateTimeFormat("en-IN", { timeZone: CAMPUS_TZ, dateStyle: "full", timeStyle: "short" }).format(new Date(ctx.now));
   // Privacy: the model sees affiliation, department, verified training and standing. Never names or emails.
