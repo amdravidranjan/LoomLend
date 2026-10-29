@@ -8,6 +8,9 @@ import { bookingRef, isOverdue, sweep } from "@/lib/workflow";
 import { overlaps } from "@/lib/rules";
 import type { AdvisoryNote } from "@/lib/ai";
 import { Badge, Empty, PageHeader, Pill, Section, parseJson } from "@/components/ui";
+import { Icon } from "@/components/ds/icons";
+
+export const metadata = { title: "Manage · LoomLend" };
 
 function managedBy(user: User, r: Resource) {
   return user.role === "admin" || (user.role === "manager" ? r.department === user.department : r.ownerId === user.id);
@@ -40,7 +43,7 @@ export default async function ManagePage() {
   return (
     <div className="space-y-6">
       <PageHeader kicker={user.role === "owner" ? "Your listings" : user.role === "manager" ? `${user.department} department` : "All departments"} title="Manage">
-        <Link href="/resources/new" className="btn-primary">+ List a resource</Link>
+        <Link href="/resources/new" className="btn-primary"><Icon name="plus" size={16} />List a resource</Link>
       </PageHeader>
 
       <div id="requests">

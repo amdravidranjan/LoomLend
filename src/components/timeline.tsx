@@ -5,15 +5,26 @@ import { ACTION_LABEL } from "@/lib/audit";
 import { currentTime, fmtDateTime, relative } from "@/lib/time";
 import { conditionLabel } from "@/lib/catalog";
 
-const SKIP = new Set(["resource", "name", "rule", "photo"]);
+// Internal ids are noise in a human-readable history; the full values stay in the audit row.
+const SKIP = new Set(["resource", "name", "rule", "photo", "roundId", "subject"]);
+const HASH = /^[0-9a-f]{32,}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function shorten(v: unknown) {
+  const s = String(v);
+  if (HASH.test(s)) return `${s.slice(0, 8)}…${s.slice(-4)}`; // seeds and commitments: enough to compare by eye
+  if (UUID.test(s)) return s.slice(0, 8);
+  return s;
+}
 
 function describe(details: Record<string, unknown>) {
   return Object.entries(details)
     .filter(([k, v]) => !SKIP.has(k) && v !== null && v !== "" && v !== undefined && v !== false)
     .map(([k, v]) => {
-      if (k.toLowerCase().includes("condition")) return `${k.replace(/([A-Z])/g, " $1").toLowerCase()}: ${conditionLabel(String(v))}`;
-      if ((k === "from" || k === "to" || k === "dueAt" || k === "requestedEnd") && typeof v === "number") return `${k}: ${fmtDateTime(v)}`;
-      return `${k.replace(/([A-Z])/g, " $1").toLowerCase()}: ${String(v)}`;
+      const label = k.replace(/([A-Z])/g, " $1").toLowerCase();
+      if (k.toLowerCase().includes("condition")) return `${label}: ${conditionLabel(String(v))}`;
+      if (["from", "to", "dueAt", "requestedEnd", "closes", "closesAt"].includes(k) && typeof v === "number") return `${label}: ${fmtDateTime(v)}`;
+      return `${label}: ${shorten(v)}`;
     })
     .join(" · ");
 }

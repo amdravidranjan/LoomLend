@@ -4,6 +4,21 @@
 
 Built for the *Unlock Underused Equipment and Spaces* hackathon problem. The use case is one campus (the fictional Northfield Institute of Technology): Fab Lab machines, electronics benches, media kit, chemistry fume hoods and shared rooms.
 
+## What makes it more than a booking system
+
+- **Proof of presence at the machine.** Every resource has a printable QR tag. Check-in and return require scanning it with the phone camera (`/scan`), or a 6-digit one-time code from staff. Supervised items always need staff. Each hand-over records how it was proven.
+- **AI photo comparison.** At return, Claude compares the check-in and return photos and lists what changed ("scratch on the lens hood"). That opens a damage report for a person to decide; the AI never decides. Without an API key, a pixel-difference heatmap runs in the browser instead.
+- **Verifiable fair draws.** High-demand resources (laser cutter, 3D printer) allocate each day by weighted lottery. The seed's SHA-256 fingerprint is published before entries close (commit–reveal), so nobody can rig it. Anyone can re-run any draw in their browser at `/fairness/rounds/<id>` and get a ✓ or ✗. People who miss out earn fairness credits that raise their weight next time.
+- **Fairness ledger** (`/fairness`): Gini coefficient and Lorenz curve per resource, share held by the top 10%, first-try success rate, and a "your fair share" panel.
+- **Booking concierge** (`/assistant`). Ask "I need to film an interview Friday afternoon" and Claude uses real tools (search, eligibility, free-slot finder) to propose options you can request in one click. The server re-checks every option against live data. A rule-based mode works without a key, and the page always says which mode answered.
+- **Impact dashboard** (`/impact`), the case for a principal: ₹ saved versus renting, use of idle hours, a demand heatmap, cross-department borrowing, unmet demand, and "buy a second unit" payback. CSV export and a print view.
+- **Two-sided disputes.** The borrower, owner and manager each add their account before a decision. A strike requires confirming "I have read both sides", and the borrower can appeal once to an admin.
+- **Production UX:**
+  - a design system with a live style guide at `/design`, and dark mode;
+  - page transitions, a mobile tab bar with Scan in the centre, the Ctrl/⌘K command palette and keyboard shortcuts;
+  - confirmations on destructive actions, add-to-calendar (.ics), and toasts with focus moved to the result;
+  - a written UX audit in `docs/ux-audit.md`.
+
 ## The lifecycle it covers
 
 1. **List.** An owner publishes a resource with opening hours, a per-booking limit, a fair-share weekly cap, allowed membership types, required training, supervision, a deposit and usage rules.
@@ -33,7 +48,17 @@ Open the deployed link, click **Try a demo account** and pick a person. All demo
 | Vikram Shah | External founder, ID unverified | See which resources are locked and why |
 | Farhan Ali | Student with 1 strike | See a waiting-list position and its explanation |
 
-**Five-minute path:** sign in as **Meena** and list a resource → switch to **Priya**, find it, check a slot and request it → back to **Meena**, approve it → **Priya** checks in, then returns it in "Fair" condition → **Meena** confirms (a damage report was opened automatically) → **Arun** resolves it → open the booking to see the full history.
+**Five-minute path:**
+1. **Priya** → **Ask**: "I need to debug a circuit with an oscilloscope tomorrow afternoon" → **Request this slot** → send.
+2. **Rahul** approves it.
+3. **Priya** opens the booking → **Simulate scanning the tag (demo)** → check in → return it in "Fair" condition. A damage report opens automatically.
+4. **Rahul** confirms the return. **Kavya** resolves the incident after reading both sides.
+5. **Meena** → Laser Cutter → **Run draw now (demo)** → **Confirm winners** → open the draw and press **Verify**.
+6. **Kavya** → **Impact**.
+
+Supervised hand-over: **Priya** opens the approved laser booking. **Meena** generates a staff code on the same booking, and Priya enters it.
+
+**Kavya → Admin → Reset demo data** restores everything between judging sessions.
 
 *Demo mode* (the default) lets you check in right after approval even for a future slot, so the journey fits in one sitting. Set `DEMO_MODE=false` for real time windows and no-show detection.
 

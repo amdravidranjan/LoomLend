@@ -9,6 +9,8 @@ import { ActionForm, Submit } from "@/components/forms";
 import { Badge, Empty, Notice, PageHeader, Pill, Section } from "@/components/ui";
 import { Timeline } from "@/components/timeline";
 
+export const metadata = { title: "Admin desk · LoomLend" };
+
 export default async function AdminPage() {
   const user = await requireUser(["manager", "admin"]);
   const admin = user.role === "admin";
@@ -58,7 +60,7 @@ export default async function AdminPage() {
                   <input type="hidden" name="certId" value={c.id} />
                   <input name="note" className="input max-w-sm flex-1" placeholder="Note (required to reject)" aria-label="Review note" />
                   <Submit className="btn-ok" name="verdict" value="verified">Verify</Submit>
-                  <Submit className="btn-ghost" name="verdict" value="rejected">Reject</Submit>
+                  <Submit className="btn-ghost" name="verdict" value="rejected" confirm={{ title: "Reject this training record?", body: "The person sees your note and can resubmit with better evidence.", confirmLabel: "Reject", tone: "danger" }}>Reject</Submit>
                 </ActionForm>
               </li>
             ))}
@@ -124,7 +126,7 @@ export default async function AdminPage() {
                           {u.suspended ? (
                             <Submit className="btn-ok px-3 py-1" name="op" value="reinstate">Reinstate</Submit>
                           ) : (
-                            <Submit className="btn-ghost px-3 py-1" name="op" value="suspend">Suspend</Submit>
+                            <Submit className="btn-ghost px-3 py-1" name="op" value="suspend" confirm={{ title: "Suspend booking privileges?", body: "They keep access to their history but cannot request anything until an administrator reinstates them. Your reason is shown to them and logged.", confirmLabel: "Suspend", tone: "danger" }}>Suspend</Submit>
                           )}
                         </ActionForm>
                       ) : null}

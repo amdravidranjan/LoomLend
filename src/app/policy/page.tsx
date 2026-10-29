@@ -3,6 +3,8 @@ import { BOOKING_HORIZON_DAYS, MAX_OPEN_REQUESTS, STRIKE_LIMIT } from "@/lib/cat
 import { CREDIT_POINTS, KEY_FORMULA, MAX_CREDITS, WEIGHT_FORMULA } from "@/lib/lottery";
 import { PageHeader, Section } from "@/components/ui";
 
+export const metadata = { title: "Fair-use policy · LoomLend" };
+
 export default function PolicyPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">

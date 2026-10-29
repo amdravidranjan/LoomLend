@@ -4,7 +4,7 @@ import { verifiedCertKeys } from "@/lib/assistant";
 import { claudeAvailable } from "@/lib/assistant-claude";
 import { Chat } from "./chat";
 
-export const metadata: Metadata = { title: "Ask LoomLend" };
+export const metadata: Metadata = { title: "Ask · LoomLend" };
 
 // Prompts that show off what this person can actually do (and one that shows an honest "not yet").
 const BY_CERT: Record<string, string> = {

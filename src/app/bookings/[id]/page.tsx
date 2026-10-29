@@ -13,6 +13,13 @@ import { ActionForm, Submit } from "@/components/forms";
 import { ConditionRecordSection, HandoverPanel } from "@/components/handover-sections";
 import { Advisory, Badge, Checks, Notice, PageHeader, Priority, Section, parseJson } from "@/components/ui";
 import { Timeline } from "@/components/timeline";
+import { CopyButton } from "@/components/ds/client";
+import { Icon } from "@/components/ds/icons";
+
+export async function generateMetadata({ params }: PageProps<"/bookings/[id]">) {
+  const { id } = await params;
+  return { title: `Booking ${bookingRef(id)} · LoomLend` };
+}
 
 const STEPS = [
   { key: "requested", label: "Requested" },
@@ -60,17 +67,32 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
         </Notice>
       )}
 
-      <div>
-        <p className="text-sm text-muted">
-          <Link href={mine ? "/bookings" : "/manage"} className="hover:underline">← {mine ? "My bookings" : "Manage"}</Link>
+      <PageHeader
+        back={{ href: mine ? "/bookings" : "/manage", label: mine ? "My bookings" : "Manage" }}
+        kicker={`Booking ${bookingRef(b.id)}`}
+        title={r.name}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton value={bookingRef(b.id)} showValue label="Copy booking reference" />
+          {mine && ["approved", "pending", "waitlisted"].includes(b.status) && b.end > now && (
+            <a href={`/api/bookings/${b.id}/ics`} download className="btn-ghost btn-sm">
+              <Icon name="calendarPlus" size={14} />
+              Add to calendar
+            </a>
+          )}
+          {overdue && <Badge status="overdue" label={`Overdue ${relative(b.end).replace(" ago", "")}`} />}
+          <Badge animate status={b.status} label={b.status === "waitlisted" ? `Waiting list #${pos}` : undefined} />
+        </div>
+      </PageHeader>
+
+      {b.roundId && (
+        <p className="-mt-3 text-sm text-muted">
+          Decided by a fair draw.{" "}
+          <Link href={`/fairness/rounds/${b.roundId}`} className="font-medium text-thread hover:underline">
+            See and verify the draw →
+          </Link>
         </p>
-        <PageHeader kicker={`Booking ${bookingRef(b.id)}`} title={`${r.emoji} ${r.name}`}>
-          <div className="flex gap-2">
-            {overdue && <Badge status="overdue" label={`Overdue ${relative(b.end).replace(" ago", "")}`} />}
-            <Badge status={b.status} label={b.status === "waitlisted" ? `Waiting list #${pos}` : undefined} />
-          </div>
-        </PageHeader>
-      </div>
+      )}
 
       <ol className="grid grid-cols-5 gap-1 text-center text-xs" aria-label="Progress">
         {STEPS.map((s, i) => {
@@ -150,7 +172,14 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
                 <div className="flex flex-wrap gap-2">
                   <Submit className="btn-ok" name="decision" value="approve">Approve</Submit>
                   {b.status !== "waitlisted" && <Submit className="btn-ghost" name="decision" value="waitlist">Waitlist</Submit>}
-                  <Submit className="btn-danger" name="decision" value="reject">Reject</Submit>
+                  <Submit
+                    className="btn-ghost text-rose"
+                    name="decision"
+                    value="reject"
+                    confirm={{ title: "Reject this request?", body: "The requester sees your reason. Make sure it explains what they could do differently.", confirmLabel: "Reject", tone: "danger" }}
+                  >
+                    Reject
+                  </Submit>
                 </div>
                 <p className="text-xs text-muted">Approving re-checks requirements and conflicts. Competing requests are moved to the waiting list with an explanation.</p>
               </ActionForm>
@@ -182,7 +211,12 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
               <ActionForm action={cancelAction}>
                 <input type="hidden" name="bookingId" value={b.id} />
                 <input name="reason" className="input" placeholder={mine ? "Reason (optional)" : "Reason for the requester (required)"} />
-                <Submit className="btn-ghost">Cancel booking</Submit>
+                <Submit
+                  className="btn-ghost"
+                  confirm={{ title: "Cancel this booking?", body: "Your slot goes to the next person on the waiting list. This can't be undone.", confirmLabel: "Cancel booking", cancelLabel: "Keep it", tone: "danger" }}
+                >
+                  Cancel booking
+                </Submit>
                 <p className="text-xs text-muted">Freeing a slot early moves the next person on the waiting list up.</p>
               </ActionForm>
             </Section>

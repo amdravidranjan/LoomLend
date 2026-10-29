@@ -30,6 +30,12 @@ function suggestSlot(openHour: number, closeHour: number, days: number[], now: n
   return { start: campusDayAt(now + DAY, openHour), end: campusDayAt(now + DAY, openHour) + HOUR };
 }
 
+export async function generateMetadata({ params }: PageProps<"/resources/[id]">) {
+  const { id } = await params;
+  const r = await db.query.resources.findFirst({ where: eq(schema.resources.id, id), columns: { name: true } });
+  return { title: r ? `${r.name} · LoomLend` : "Not found · LoomLend" };
+}
+
 export default async function ResourcePage({ params, searchParams }: PageProps<"/resources/[id]">) {
   const { id } = await params;
   const sp = await searchParams;

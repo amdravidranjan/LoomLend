@@ -14,6 +14,8 @@ import { CopyHash } from "../../_components/copy-hash";
 import { Countdown } from "../../_components/countdown";
 import { VerifyInBrowser } from "./verify";
 
+export const metadata = { title: "Verify a draw · LoomLend" };
+
 export default async function RoundPage({ params }: PageProps<"/fairness/rounds/[id]">) {
   const { id } = await params;
   await sweep();

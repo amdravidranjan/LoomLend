@@ -5,6 +5,8 @@ import { createResourceAction } from "@/app/actions";
 import { ActionForm, Submit } from "@/components/forms";
 import { PageHeader, Section } from "@/components/ui";
 
+export const metadata = { title: "List a resource · LoomLend" };
+
 export default async function NewResourcePage() {
   const user = await requireUser(["owner", "manager", "admin"]);
   return (

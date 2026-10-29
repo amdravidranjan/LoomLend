@@ -18,6 +18,8 @@ import { ConditionCompare } from "@/components/handover-compare";
 import { HandoverPhotoInput } from "@/components/handover-photo";
 import { ProofBadge } from "@/components/handover-sections";
 
+export const metadata = { title: "Incident · LoomLend" };
+
 const ROLE_STYLE = {
   borrower: { label: "Borrower", chip: "bg-saffron-soft text-saffron", side: "sm:mr-10" },
   owner: { label: "Owner", chip: "bg-thread-soft text-thread", side: "sm:ml-10" },

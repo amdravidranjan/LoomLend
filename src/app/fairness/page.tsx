@@ -9,6 +9,8 @@ import { Empty, PageHeader, Pill, Section } from "@/components/ui";
 import { Countdown } from "./_components/countdown";
 import { LorenzChart, Meter } from "./_components/lorenz";
 
+export const metadata = { title: "Fairness ledger · LoomLend" };
+
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 function giniWords(g: number) {

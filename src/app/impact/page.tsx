@@ -12,7 +12,7 @@ import { Heatmap } from "@/components/charts/heatmap";
 import { FlowMatrix } from "@/components/charts/flow-matrix";
 import { PrintButton } from "./print-button";
 
-export const metadata: Metadata = { title: "Impact" };
+export const metadata: Metadata = { title: "Impact · LoomLend" };
 
 type Kpi = {
   key: keyof Totals;
