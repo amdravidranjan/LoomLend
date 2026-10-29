@@ -28,6 +28,9 @@ export default async function ManagePage() {
   const res = (id: string) => resources.find((r) => r.id === id)!;
   const now = currentTime();
 
+  const openRounds = await db.select().from(schema.allocationRounds).where(eq(schema.allocationRounds.status, "open"));
+  const roundOf = (roundId: string | null) => (roundId ? openRounds.find((x) => x.id === roundId) : undefined);
+
   const pending = rows.filter(({ b }) => b.status === "pending");
   const waiting = rows.filter(({ b }) => b.status === "waitlisted" && b.end > now);
   const returns = rows.filter(({ b }) => b.status === "returned");
@@ -50,8 +53,24 @@ export default async function ManagePage() {
                 const r = res(b.resourceId);
                 const rivals = pending.filter((p) => p.b.id !== b.id && p.b.resourceId === b.resourceId && overlaps(p.b, b));
                 const ai = parseJson<AdvisoryNote | null>(b.aiReview, null);
+                const round = roundOf(b.roundId);
+                if (round) {
+                  return (
+                    <li key={b.id} className="rounded-lg border border-dashed border-line bg-card p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{r.emoji} {r.name}</p>
+                          <p className="text-sm text-muted">{fmtRange(b.start, b.end)} · {u.name} ({u.department})</p>
+                        </div>
+                        <Pill tone="info">In the draw · closes {relative(round.closesAt, now)}</Pill>
+                      </div>
+                      <p className="mt-2 text-sm text-muted">This request is decided by the fair draw, not individually. You confirm the winners after it runs.</p>
+                      <Link href={`/resources/${r.id}#draw`} className="btn-ghost mt-3">Go to the draw →</Link>
+                    </li>
+                  );
+                }
                 return (
-                  <li key={b.id} className="rounded-lg border border-line bg-white p-4">
+                  <li key={b.id} className="rounded-lg border border-line bg-card p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="font-medium">{r.emoji} {r.name}</p>
@@ -166,7 +185,7 @@ export default async function ManagePage() {
         <ul className="grid gap-2 sm:grid-cols-2">
           {resources.map((r) => (
             <li key={r.id}>
-              <Link href={`/resources/${r.id}`} className="flex items-center justify-between gap-2 rounded-md border border-line bg-white p-2 text-sm hover:border-thread">
+              <Link href={`/resources/${r.id}`} className="flex items-center justify-between gap-2 rounded-md border border-line bg-card p-2 text-sm hover:border-thread">
                 <span>{r.emoji} {r.name}</span>
                 <Badge status={r.status} />
               </Link>

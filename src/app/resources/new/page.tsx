@@ -119,6 +119,43 @@ export default async function NewResourcePage() {
           </div>
           <p className="mt-2 text-xs text-muted">Instant approval is ignored when supervision is required: a person always reviews supervised resources.</p>
         </Section>
+
+        <Section title="When more people want it than there are hours">
+          <fieldset>
+            <legend className="label">How requests are decided</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex items-start gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm has-[:checked]:border-thread has-[:checked]:bg-thread-soft">
+                <input type="radio" name="allocationMode" value="review" defaultChecked className="mt-1 accent-thread" />
+                <span>
+                  <strong>Owner review</strong>
+                  <span className="block text-xs text-muted">
+                    You decide each request, guided by a published priority score. Best when demand is light, or you need to read every purpose.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm has-[:checked]:border-thread has-[:checked]:bg-thread-soft">
+                <input type="radio" name="allocationMode" value="rounds" className="mt-1 accent-thread" />
+                <span>
+                  <strong>Fair-draw rounds</strong>
+                  <span className="block text-xs text-muted">
+                    Requests for each day are pooled and drawn by a verifiable weighted lottery. Nobody wins by refreshing first; people who miss out earn
+                    a boost next time. You confirm the winners in one click. Choose this when slots regularly have several people asking.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[12rem_1fr] sm:items-end">
+            <div>
+              <label className="label" htmlFor="roundLeadHours">Entries close (hours before the day)</label>
+              <input id="roundLeadHours" name="roundLeadHours" type="number" min={1} max={168} defaultValue={24} className="input" />
+            </div>
+            <p className="text-xs text-muted">
+              Only used with fair-draw rounds. With 24, requests for Thursday close at midnight on Tuesday night and are drawn then, giving winners a day to
+              plan. Requests after the close are reviewed one by one.
+            </p>
+          </div>
+        </Section>
         <Submit>Publish listing</Submit>
       </ActionForm>
     </div>

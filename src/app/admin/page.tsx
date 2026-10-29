@@ -50,7 +50,7 @@ export default async function AdminPage() {
         {pendingCerts.length === 0 ? <Empty>Nothing waiting.</Empty> : (
           <ul className="space-y-3">
             {pendingCerts.map(({ c, u }) => (
-              <li key={c.id} className="rounded-lg border border-line bg-white p-4">
+              <li key={c.id} className="rounded-lg border border-line bg-card p-4">
                 <p className="font-medium">{u.name} · {CERTS[c.certKey]?.label}</p>
                 <p className="text-sm text-muted">{u.department} · {AFFILIATIONS[u.affiliation]} · submitted {relative(c.createdAt)}</p>
                 <p className="mt-1 text-sm">Evidence: {c.evidence}</p>

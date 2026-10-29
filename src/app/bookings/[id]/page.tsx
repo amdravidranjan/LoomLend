@@ -3,14 +3,15 @@ import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { canManageResource, requireUser } from "@/lib/auth";
-import { AFFILIATIONS, PURPOSES, conditionRank } from "@/lib/catalog";
-import { fmtDateTime, fmtRange, relative } from "@/lib/time";
-import { bookingRef, demoMode, isOverdue, sweep, waitlistPosition } from "@/lib/workflow";
+import { AFFILIATIONS, PURPOSES } from "@/lib/catalog";
+import { currentTime, fmtRange, relative } from "@/lib/time";
+import { bookingRef, isOverdue, sweep, waitlistPosition } from "@/lib/workflow";
 import type { Eligibility, PriorityFactor } from "@/lib/rules";
 import type { AdvisoryNote } from "@/lib/ai";
-import { cancelAction, checkOutAction, confirmReturnAction, decideAction, extendAction, reportIncidentAction, returnAction } from "@/app/actions";
-import { ActionForm, ConditionSelect, PhotoInput, Submit } from "@/components/forms";
-import { Advisory, Badge, Checks, Condition, Notice, PageHeader, Priority, Section, parseJson } from "@/components/ui";
+import { cancelAction, decideAction, extendAction, reportIncidentAction } from "@/app/actions";
+import { ActionForm, Submit } from "@/components/forms";
+import { ConditionRecordSection, HandoverPanel } from "@/components/handover-sections";
+import { Advisory, Badge, Checks, Notice, PageHeader, Priority, Section, parseJson } from "@/components/ui";
 import { Timeline } from "@/components/timeline";
 
 const STEPS = [
@@ -48,6 +49,7 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
   const overdue = isOverdue(b);
   const step = stepIndex(b.status);
   const ended = ["rejected", "cancelled"].includes(b.status);
+  const now = currentTime();
 
   return (
     <div className="space-y-6">
@@ -108,44 +110,14 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
 
           {staff && ai && <Advisory note={ai} title="Request notes for the reviewer" />}
 
-          {(b.checkOutAt || b.returnAt) && (
-            <Section title="Condition record">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  { title: "At check-in", at: b.checkOutAt, cond: b.checkOutCondition, notes: b.checkOutNotes, photo: b.checkOutPhoto },
-                  { title: "At return", at: b.returnAt, cond: b.returnCondition, notes: b.returnNotes, photo: b.returnPhoto },
-                ].map((c) => (
-                  <div key={c.title} className="rounded-lg border border-line bg-white p-3 text-sm">
-                    <p className="label">{c.title}</p>
-                    {c.at ? (
-                      <>
-                        <p><Condition value={c.cond} /></p>
-                        <p className="text-muted">{fmtDateTime(c.at)}</p>
-                        {c.notes && <p className="mt-1">{c.notes}</p>}
-                        {c.photo && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={c.photo} alt={`Condition photo ${c.title.toLowerCase()}`} className="mt-2 max-h-48 rounded border border-line" />
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-muted">Not yet recorded</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {b.returnAt && conditionRank(b.returnCondition) < conditionRank(b.checkOutCondition) && (
-                <p className="mt-3 text-sm text-rose">Condition dropped between check-in and return. A damage report was opened automatically for a manager to review.</p>
-              )}
-              {b.returnAt && b.returnAt > b.end && <p className="mt-1 text-sm text-saffron">Returned {Math.round((b.returnAt - b.end) / 60000)} min after the slot ended.</p>}
-            </Section>
-          )}
+          <ConditionRecordSection b={b} history={history} canRetry={mine || staff} now={now} />
 
           {incidents.length > 0 && (
             <Section title="Incidents">
               <ul className="space-y-2 text-sm">
                 {incidents.map((i) => (
                   <li key={i.id}>
-                    <Link href={`/incidents/${i.id}`} className="flex items-center justify-between gap-2 rounded-md border border-line bg-white p-2 hover:border-thread">
+                    <Link href={`/incidents/${i.id}`} className="flex items-center justify-between gap-2 rounded-md border border-line bg-card p-2 hover:border-thread">
                       <span className="capitalize">{i.type} · {i.severity} severity</span>
                       <Badge status={i.status} />
                     </Link>
@@ -185,59 +157,7 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
             </Section>
           )}
 
-          {b.status === "approved" && (mine || staff) && (
-            <Section title={r.supervisionRequired ? "Supervised check-in" : "Check in"}>
-              {r.supervisionRequired && !staff ? (
-                <p className="text-sm">This resource needs staff present. Meet the owner at {r.location}; they inspect it with you and record the check-in.</p>
-              ) : (
-                <ActionForm action={checkOutAction}>
-                  <input type="hidden" name="bookingId" value={b.id} />
-                  <p className="text-sm text-muted">Inspect it before you start and record what you see. This protects you if something was already wrong.</p>
-                  <ConditionSelect />
-                  <div>
-                    <label className="label" htmlFor="co-notes">Notes</label>
-                    <textarea id="co-notes" name="notes" rows={2} className="input" placeholder="e.g. All probes present, small scratch on the left side." />
-                  </div>
-                  <PhotoInput />
-                  <Submit>{staff && !mine ? (r.supervisionRequired ? "Record supervised check-in" : "Record check-in for borrower") : "Check in now"}</Submit>
-                  {demoMode() && <p className="text-xs text-muted">Demo mode: time window relaxed.</p>}
-                </ActionForm>
-              )}
-            </Section>
-          )}
-
-          {b.status === "checked_out" && (mine || staff) && (
-            <Section title="Return">
-              <ActionForm action={returnAction}>
-                <input type="hidden" name="bookingId" value={b.id} />
-                <p className="text-sm text-muted">Due {fmtDateTime(b.end)}. Record the condition you are returning it in.</p>
-                <ConditionSelect defaultValue={b.checkOutCondition ?? "good"} />
-                <div>
-                  <label className="label" htmlFor="rt-notes">Notes</label>
-                  <textarea id="rt-notes" name="notes" rows={2} className="input" placeholder="Anything the owner should know." />
-                </div>
-                <PhotoInput />
-                <Submit>Return it</Submit>
-              </ActionForm>
-            </Section>
-          )}
-
-          {b.status === "returned" && staff && (
-            <Section title="Inspect & confirm return">
-              <ActionForm action={confirmReturnAction}>
-                <input type="hidden" name="bookingId" value={b.id} />
-                <p className="text-sm">Borrower says: <Condition value={b.returnCondition} />. What do you see?</p>
-                <ConditionSelect defaultValue={b.returnCondition ?? "good"} />
-                <div>
-                  <label className="label" htmlFor="cf-notes">Inspection notes</label>
-                  <textarea id="cf-notes" name="notes" rows={2} className="input" />
-                </div>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="reportDamage" className="accent-rose" /> Open a damage report for a manager</label>
-                <Submit className="btn-ok">Confirm & close</Submit>
-              </ActionForm>
-            </Section>
-          )}
-          {b.status === "returned" && mine && !staff && <Notice>Waiting for the owner to inspect and confirm your return.</Notice>}
+          <HandoverPanel b={b} r={r} user={user} handover={typeof sp.handover === "string" ? sp.handover : undefined} now={now} />
 
           {mine && ["approved", "checked_out"].includes(b.status) && (
             <Section title="Need more time?">

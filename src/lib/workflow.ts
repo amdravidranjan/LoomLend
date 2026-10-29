@@ -8,7 +8,10 @@ import { canManageResource } from "./auth";
 import { reviewRequest, summarizeIncident } from "./ai";
 import { evaluate, priorityScore, profileChecks, windowChecks, eligibilitySummary, type Eligibility } from "./rules";
 import { STRIKE_LIMIT, conditionLabel, conditionRank } from "./catalog";
-import { HOUR, fmtRange } from "./time";
+import { HOUR, fmtDateTime, fmtDay, fmtRange } from "./time";
+import { drawDueRounds, drawRanks, getCredits, inOpenRound, queueOrder, roundForRequest, roundLink } from "./allocation";
+import { verifyHandoverProof } from "./handover";
+import { checkInWindow, photoRequired, type ProofInput } from "./handover-rules";
 
 export class WorkflowError extends Error {}
 
@@ -57,7 +60,8 @@ async function competing(resourceId: string, start: number, end: number, exclude
 export async function waitlistPosition(b: Booking) {
   const queue = (await competing(b.resourceId, b.start, b.end)).concat(b).filter((x) => x.status === "waitlisted");
   const unique = [...new Map(queue.map((x) => [x.id, x])).values()];
-  unique.sort((x, y) => y.priorityScore - x.priorityScore || x.createdAt - y.createdAt);
+  // Draw losers queue in the published draw order; everyone else by priority, then who asked first.
+  unique.sort(queueOrder(await drawRanks(unique)));
   return unique.findIndex((x) => x.id === b.id) + 1;
 }
 
@@ -76,7 +80,8 @@ export async function requestBooking(
 
   const history = await userBookings(user.id);
   const now = Date.now();
-  const { score, factors } = priorityScore({ purposeType: input.purposeType, createdAt: now, resourceId: resource.id }, user, history, now);
+  const credits = await getCredits(user.id, resource.id);
+  const { score, factors } = priorityScore({ purposeType: input.purposeType, createdAt: now, resourceId: resource.id }, user, history, now, credits);
   const holders = await slotHolders(resource.id, input.start, input.end);
   const rivals = await competing(resource.id, input.start, input.end);
   const pastIncidents = await db.select({ id: schema.incidents.id }).from(schema.incidents).where(eq(schema.incidents.subjectUserId, user.id));
@@ -85,10 +90,14 @@ export async function requestBooking(
   let status: Booking["status"] = "pending";
   let reason: string | null = null;
   const decidedBy: string | null = null;
+  // High-demand resources pool requests for a day into a verifiable weighted draw (see /policy).
+  const round = holders.length ? null : await roundForRequest(resource, input.start, now);
 
   if (holders.length) {
     status = "waitlisted";
     reason = `This slot overlaps an approved booking (${holders.map((h) => fmtRange(h.start, h.end)).join("; ")}). You are on the waiting list and will be moved up automatically if it frees up.`;
+  } else if (round) {
+    reason = `In the draw for ${fmtDay(round.dayStart + 12 * HOUR)}; results at ${fmtDateTime(round.closesAt)}. Your chance is weighted by your priority score (${score}). Asking early gives no advantage. Draw page: ${roundLink(round.id)}`;
   } else if (resource.autoApprove && !resource.supervisionRequired && rivals.length === 0) {
     status = "approved";
     reason = "Auto-approved: the owner allows instant booking for this low-risk resource, all requirements were met and there was no competing request.";
@@ -132,12 +141,16 @@ export async function requestBooking(
     priorityScore: score,
     priorityBreakdown: JSON.stringify(factors),
     aiReview: JSON.stringify(ai),
+    roundId: round?.id ?? null,
     createdAt: now,
   });
-  await audit({ actorId: user.id, action: "booking.requested", entityType: "booking", entityId: id, details: { resource: resource.name, slot: fmtRange(input.start, input.end), priority: score } });
+  await audit({ actorId: user.id, action: "booking.requested", entityType: "booking", entityId: id, details: { resource: resource.name, slot: fmtRange(input.start, input.end), priority: score, roundId: round?.id ?? null } });
 
   const link = `/bookings/${id}`;
-  if (status === "approved") {
+  if (round) {
+    await audit({ actorId: null, action: "round.entered", entityType: "booking", entityId: id, details: { roundId: round.id, weightScore: score, credits } });
+    await notify(user.id, "submitted", `Entered the draw: ${resource.name}`, `${fmtRange(input.start, input.end)}. ${reason}`, link);
+  } else if (status === "approved") {
     await audit({ actorId: null, action: "booking.auto_approved", entityType: "booking", entityId: id, details: { rule: "owner auto-approve" } });
     await notify(user.id, "approved", `Approved: ${resource.name}`, `${fmtRange(input.start, input.end)}. ${reason}`, link);
     await notify(resource.ownerId, "info", `Auto-approved booking for ${resource.name}`, `${user.name} · ${fmtRange(input.start, input.end)}`, link);
@@ -164,6 +177,11 @@ export async function decide(actor: User, bookingId: string, decision: "approve"
   const { b, r } = await getBooking(bookingId);
   if (!canManageResource(actor, r)) throw new WorkflowError("You do not manage this resource.");
   if (!["pending", "waitlisted"].includes(b.status)) throw new WorkflowError(`This request is already ${b.status}.`);
+  const openRound = decision === "reject" ? null : await inOpenRound(b);
+  if (openRound)
+    throw new WorkflowError(
+      `This request is in the draw for ${fmtDay(openRound.dayStart + 12 * HOUR)}, which closes ${fmtDateTime(openRound.closesAt)}. Winners are decided by the published draw, then you confirm them. You can still reject it with a reason if it breaks a rule.`,
+    );
   if (decision !== "approve" && reason.trim().length < 5) throw new WorkflowError("Please give the requester a reason.");
   const requester = (await db.query.users.findFirst({ where: eq(schema.users.id, b.userId) }))!;
   const link = `/bookings/${b.id}`;
@@ -203,11 +221,13 @@ export async function decide(actor: User, bookingId: string, decision: "approve"
 /** A slot freed up: move waiting requests that no longer conflict back into review, best priority first. */
 async function promoteWaitlist(resource: Resource, freed: { start: number; end: number }) {
   const waiting = (await competing(resource.id, freed.start, freed.end)).filter((w) => w.status === "waitlisted");
-  waiting.sort((x, y) => y.priorityScore - x.priorityScore || x.createdAt - y.createdAt);
+  waiting.sort(queueOrder(await drawRanks(waiting)));
   for (const w of waiting) {
     if ((await slotHolders(resource.id, w.start, w.end)).length) continue;
     if (w.end < Date.now()) continue;
-    const why = "A slot opened up. Your request is back with the owner for review (you were first in line by priority).";
+    const why = w.roundId
+      ? "A slot opened up. Your request is back with the owner for review (you were next in the published draw order)."
+      : "A slot opened up. Your request is back with the owner for review (you were first in line by priority).";
     await db.update(T).set({ status: "pending", decisionReason: why }).where(eq(T.id, w.id));
     await audit({ actorId: null, action: "booking.promoted", entityType: "booking", entityId: w.id, details: { reason: why } });
     await notify(w.userId, "promoted", `Moved up: ${resource.name}`, why, `/bookings/${w.id}`);
@@ -226,7 +246,8 @@ export async function cancelBooking(actor: User, bookingId: string, reason: stri
   await audit({ actorId: actor.id, action: "booking.cancelled", entityType: "booking", entityId: b.id, details: { reason: note, by: own ? "requester" : "manager", hoursBeforeStart: Math.round((b.start - Date.now()) / HOUR) } });
   if (own) await notify(r.ownerId, "cancelled", `Cancelled: ${r.name}`, `${actor.name} cancelled ${fmtRange(b.start, b.end)}.`, `/bookings/${b.id}`);
   else await notify(b.userId, "cancelled", `Your booking was cancelled: ${r.name}`, note, `/bookings/${b.id}`);
-  if (b.status === "approved") await promoteWaitlist(r, b);
+  // A cancelled approval, or a draw winner withdrawing before confirmation, frees the slot for the queue.
+  if (b.status === "approved" || (b.status === "pending" && b.roundId && !(await inOpenRound(b)))) await promoteWaitlist(r, b);
 }
 
 export async function extendBooking(actor: User, bookingId: string, newEnd: number) {
@@ -252,37 +273,84 @@ export async function extendBooking(actor: User, bookingId: string, newEnd: numb
 
 type ConditionInput = { condition: string; notes: string; photo?: string | null };
 
-export async function checkOut(actor: User, bookingId: string, c: ConditionInput) {
-  const { b, r } = await getBooking(bookingId);
-  const staff = canManageResource(actor, r);
-  if (b.userId !== actor.id && !staff) throw new WorkflowError("Not allowed.");
-  if (b.status !== "approved") throw new WorkflowError("Only approved bookings can be checked in.");
-  if (r.supervisionRequired && !staff) throw new WorkflowError("This resource needs a supervised check-in: the owner or manager records it with you present.");
-  const now = Date.now();
-  if (!demoMode() && (now < b.start - 30 * 60_000 || now > b.end)) throw new WorkflowError("Check-in opens 30 minutes before your slot.");
+function checkConditionInput(r: Resource, c: ConditionInput) {
   if (!conditionRank(c.condition)) throw new WorkflowError("Record the condition.");
-  await db
-    .update(T)
-    .set({ status: "checked_out", checkOutAt: now, checkOutCondition: c.condition, checkOutNotes: c.notes.trim() || null, checkOutPhoto: c.photo || null })
-    .where(eq(T.id, b.id));
-  await audit({ actorId: actor.id, action: "booking.checked_out", entityType: "booking", entityId: b.id, details: { condition: c.condition, notes: c.notes, photo: Boolean(c.photo), supervisedBy: staff && b.userId !== actor.id ? actor.name : null } });
-  const other = b.userId === actor.id ? r.ownerId : b.userId;
-  await notify(other, "checked_out", `Checked in: ${r.name}`, `Condition at pick-up: ${conditionLabel(c.condition)}. Due back ${fmtRange(b.start, b.end)}.`, `/bookings/${b.id}`);
+  if (c.notes.length > 1000) throw new WorkflowError("Keep the notes under 1000 characters.");
+  if (c.photo && (!/^data:image\/(jpeg|png|webp);base64,/.test(c.photo) || c.photo.length > 1_500_000)) throw new WorkflowError("Photo is invalid or too large.");
+  if (!c.photo && photoRequired(r))
+    throw new WorkflowError(
+      r.supervisionRequired ? "A condition photo is required for supervised items. Take one of the item as it is now." : `A condition photo is required because this item carries a ₹${r.depositRequired} deposit. It protects you if something is disputed later.`,
+    );
 }
 
-export async function returnResource(actor: User, bookingId: string, c: ConditionInput) {
+/**
+ * Pick-up. `proof` shows the person is physically at the item: a QR tag scan, a staff one-time code,
+ * or staff recording it in person. See handover-rules.ts for which methods each person may use.
+ */
+export async function checkOut(actor: User, bookingId: string, c: ConditionInput, proof: ProofInput | null) {
   const { b, r } = await getBooking(bookingId);
-  if (b.userId !== actor.id && !canManageResource(actor, r)) throw new WorkflowError("Not allowed.");
-  if (b.status !== "checked_out") throw new WorkflowError("Only items in use can be returned.");
-  if (!conditionRank(c.condition)) throw new WorkflowError("Record the condition.");
+  const staff = canManageResource(actor, r);
+  if (b.userId !== actor.id && !staff) throw new WorkflowError("Only the borrower or the staff who manage this item can check it in.");
+  if (b.status === "checked_out") throw new WorkflowError("This booking is already checked in.");
+  if (b.status !== "approved") throw new WorkflowError("Only approved bookings can be checked in.");
   const now = Date.now();
-  await db
+  const window = checkInWindow(b, now, demoMode());
+  if (window === "early") throw new WorkflowError(`Too early: check-in opens 30 minutes before your slot (${fmtRange(b.start, b.end)}).`);
+  if (window === "ended") throw new WorkflowError("This slot has already ended. Book a new slot.");
+  checkConditionInput(r, c);
+  const p = await verifyHandoverProof(actor, b, r, "check_out", proof);
+  const done = await db
     .update(T)
-    .set({ status: "returned", returnAt: now, returnCondition: c.condition, returnNotes: c.notes.trim() || null, returnPhoto: c.photo || null })
-    .where(eq(T.id, b.id));
+    .set({ status: "checked_out", checkOutAt: now, checkOutCondition: c.condition, checkOutNotes: c.notes.trim() || null, checkOutPhoto: c.photo || null, checkOutMethod: p.method })
+    .where(and(eq(T.id, b.id), eq(T.status, "approved")))
+    .returning({ id: T.id });
+  if (!done.length) throw new WorkflowError("This booking changed while you were checking in. Reload the page.");
+  const coSigner = p.coSignerId ? (await db.query.users.findFirst({ where: eq(schema.users.id, p.coSignerId) }))?.name ?? null : null;
+  await audit({
+    actorId: actor.id,
+    action: "booking.checked_out",
+    entityType: "booking",
+    entityId: b.id,
+    details: { condition: c.condition, notes: c.notes, photo: Boolean(c.photo), proof: p.label, method: p.method, coSignedBy: coSigner, simulated: p.simulated },
+  });
+  const other = b.userId === actor.id ? r.ownerId : b.userId;
+  await notify(other, "checked_out", `Checked in: ${r.name}`, `Condition at pick-up: ${conditionLabel(c.condition)}. ${p.label}. Due back ${fmtRange(b.start, b.end)}.`, `/bookings/${b.id}`);
+}
+
+/** Drop-off. Returns whether both photos exist, so the caller can schedule the vision comparison. */
+export async function returnResource(actor: User, bookingId: string, c: ConditionInput, proof: ProofInput | null) {
+  const { b, r } = await getBooking(bookingId);
+  if (b.userId !== actor.id && !canManageResource(actor, r)) throw new WorkflowError("Only the borrower or the staff who manage this item can record the return.");
+  if (b.status === "returned" || b.status === "closed") throw new WorkflowError("This item has already been returned.");
+  if (b.status !== "checked_out") throw new WorkflowError("Only items in use can be returned.");
+  checkConditionInput(r, c);
+  const p = await verifyHandoverProof(actor, b, r, "return", proof);
+  const now = Date.now();
+  const comparePhotos = Boolean(b.checkOutPhoto && c.photo);
+  const done = await db
+    .update(T)
+    .set({
+      status: "returned",
+      returnAt: now,
+      returnCondition: c.condition,
+      returnNotes: c.notes.trim() || null,
+      returnPhoto: c.photo || null,
+      returnMethod: p.method,
+      aiConditionDiff: comparePhotos ? JSON.stringify({ status: "pending", requestedAt: now }) : null,
+    })
+    .where(and(eq(T.id, b.id), eq(T.status, "checked_out")))
+    .returning({ id: T.id });
+  if (!done.length) throw new WorkflowError("This booking changed while you were returning it. Reload the page.");
   const late = Math.max(0, Math.round((now - b.end) / 60_000));
-  await audit({ actorId: actor.id, action: "booking.returned", entityType: "booking", entityId: b.id, details: { condition: c.condition, notes: c.notes, minutesLate: late, photo: Boolean(c.photo) } });
-  await notify(r.ownerId, "returned", `Returned: ${r.name}`, `Borrower reports ${conditionLabel(c.condition)}${late ? `, ${late} min late` : ""}. Please inspect and confirm.`, `/bookings/${b.id}`);
+  const coSigner = p.coSignerId ? (await db.query.users.findFirst({ where: eq(schema.users.id, p.coSignerId) }))?.name ?? null : null;
+  await audit({
+    actorId: actor.id,
+    action: "booking.returned",
+    entityType: "booking",
+    entityId: b.id,
+    details: { condition: c.condition, notes: c.notes, minutesLate: late, photo: Boolean(c.photo), proof: p.label, method: p.method, coSignedBy: coSigner, simulated: p.simulated },
+  });
+  await notify(r.ownerId, "returned", `Returned: ${r.name}`, `Borrower reports ${conditionLabel(c.condition)}${late ? `, ${late} min late` : ""}. ${p.label}. Please inspect and confirm.`, `/bookings/${b.id}`);
   if (conditionRank(c.condition) < conditionRank(b.checkOutCondition)) {
     await reportIncident(
       actor,
@@ -296,6 +364,7 @@ export async function returnResource(actor: User, bookingId: string, c: Conditio
       true,
     );
   }
+  return { comparePhotos };
 }
 
 export async function confirmReturn(actor: User, bookingId: string, input: { condition: string; notes: string; reportDamage: boolean }) {
@@ -364,11 +433,16 @@ export async function reportIncident(
   await notify(r.ownerId, "incident", `Incident on ${r.name}`, `${input.type} · ${input.severity} severity. Needs human review.`, link);
   const managers = await db.select().from(schema.users).where(and(eq(schema.users.role, "manager"), eq(schema.users.department, r.department)));
   for (const m of managers) await notify(m.id, "incident", `Incident on ${r.name}`, `${input.type} · ${input.severity} severity.`, link);
-  if (b && b.userId !== actor?.id) await notify(b.userId, "incident", `An incident was filed on your booking`, `${input.type}: you can view it and add your side.`, link);
+  // The borrower always hears about it (including automatic reports) so they can add their side.
+  if (b && (system || b.userId !== actor?.id)) await notify(b.userId, "incident", `An incident was filed on your booking`, `${input.type}: you can view it and add your side before a manager decides.`, link);
   return id;
 }
 
-export async function resolveIncident(actor: User, incidentId: string, input: { resolution: string; issueStrike: boolean; dismiss: boolean }) {
+export async function resolveIncident(
+  actor: User,
+  incidentId: string,
+  input: { resolution: string; issueStrike: boolean; dismiss: boolean; readBothSides?: boolean },
+) {
   const inc = await db.query.incidents.findFirst({ where: eq(schema.incidents.id, incidentId) });
   if (!inc) throw new WorkflowError("Incident not found.");
   const r = (await db.query.resources.findFirst({ where: eq(schema.resources.id, inc.resourceId) }))!;
@@ -377,14 +451,34 @@ export async function resolveIncident(actor: User, incidentId: string, input: { 
   if (inc.status !== "open") throw new WorkflowError("Already closed.");
   if (input.resolution.trim().length < 10) throw new WorkflowError("Write a resolution note (at least 10 characters). It is shown to everyone involved.");
   const strike = input.issueStrike && !input.dismiss && Boolean(inc.subjectUserId);
-  await db
+  if (strike && !input.readBothSides) throw new WorkflowError("Confirm that you have read both sides before issuing a strike.");
+  if (strike && inc.subjectUserId === actor.id) throw new WorkflowError("You cannot issue a strike to yourself. Ask another manager or an administrator.");
+  const statements = await db.select({ role: schema.incidentStatements.role }).from(schema.incidentStatements).where(eq(schema.incidentStatements.incidentId, inc.id));
+  const claimed = await db
     .update(schema.incidents)
     .set({ status: input.dismiss ? "dismissed" : "resolved", resolution: input.resolution.trim(), strikeIssued: strike, resolvedBy: actor.id, resolvedAt: Date.now() })
-    .where(eq(schema.incidents.id, inc.id));
-  await audit({ actorId: actor.id, action: input.dismiss ? "incident.dismissed" : "incident.resolved", entityType: "incident", entityId: inc.id, bookingId: inc.bookingId, details: { resolution: input.resolution, strike } });
+    .where(and(eq(schema.incidents.id, inc.id), eq(schema.incidents.status, "open")))
+    .returning({ id: schema.incidents.id });
+  if (!claimed.length) throw new WorkflowError("Someone else closed this incident a moment ago.");
+  await audit({
+    actorId: actor.id,
+    action: input.dismiss ? "incident.dismissed" : "incident.resolved",
+    entityType: "incident",
+    entityId: inc.id,
+    bookingId: inc.bookingId,
+    details: { resolution: input.resolution, strike, borrowerResponded: statements.some((s) => s.role === "borrower"), statements: statements.length, readBothSides: Boolean(input.readBothSides) },
+  });
   if (inc.subjectUserId) {
-    await notify(inc.subjectUserId, "incident", `Incident ${input.dismiss ? "dismissed" : "resolved"}: ${r.name}`, input.resolution.trim(), `/incidents/${inc.id}`);
+    await notify(
+      inc.subjectUserId,
+      "incident",
+      `Incident ${input.dismiss ? "dismissed" : "resolved"}: ${r.name}`,
+      `${input.resolution.trim()}${strike ? " If you disagree, you can appeal to an administrator from the incident page." : ""}`,
+      `/incidents/${inc.id}`,
+    );
   }
+  if (r.ownerId !== actor.id && r.ownerId !== inc.subjectUserId)
+    await notify(r.ownerId, "incident", `Incident ${input.dismiss ? "dismissed" : "resolved"}: ${r.name}`, input.resolution.trim(), `/incidents/${inc.id}`);
   if (strike && inc.subjectUserId) await addStrike(actor, inc.subjectUserId, `Incident on ${r.name}: ${input.resolution.trim()}`);
 }
 
@@ -410,6 +504,9 @@ export async function sweep(force = false) {
   const now = Date.now();
   if (!force && now - lastSweep < 60_000) return;
   lastSweep = now;
+
+  // Allocation rounds whose closing time has passed: reveal the seed and draw.
+  await drawDueRounds(now);
 
   const upcoming = await db
     .select()

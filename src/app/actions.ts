@@ -13,10 +13,14 @@ import { CERTS } from "@/lib/catalog";
 import { parseCampusLocal } from "@/lib/time";
 import { seedDemo, DEMO_ACCOUNTS } from "@/lib/seed";
 import * as wf from "@/lib/workflow";
+import { newQrSecret } from "@/lib/handover-rules";
+import { proofFromForm } from "@/lib/handover";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+/** Only same-site relative paths, so a crafted ?next= cannot send people to another site. */
+const safeNext = (next: string) => (next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/");
 
 async function run(fn: () => Promise<string | void>): Promise<FormState> {
   try {
@@ -36,7 +40,7 @@ export async function loginAction(_: FormState, fd: FormData): Promise<FormState
   const user = await db.query.users.findFirst({ where: eq(schema.users.email, str(fd, "email").toLowerCase()) });
   if (!user || !(await bcrypt.compare(str(fd, "password"), user.passwordHash))) return { error: "Email or password is incorrect." };
   await createSession(user.id);
-  redirect("/");
+  redirect(safeNext(str(fd, "next")));
 }
 
 export async function demoLoginAction(fd: FormData) {
@@ -45,7 +49,7 @@ export async function demoLoginAction(fd: FormData) {
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, id) });
   if (!user) return;
   await createSession(user.id);
-  redirect(str(fd, "next") || "/");
+  redirect(safeNext(str(fd, "next")));
 }
 
 export async function logoutAction() {
@@ -100,6 +104,8 @@ const resourceSchema = z.object({
   maxHours: z.coerce.number().int().min(1).max(24),
   weeklyHourCap: z.coerce.number().int().min(1).max(80),
   depositRequired: z.coerce.number().int().min(0),
+  allocationMode: z.enum(["review", "rounds"]).default("review"),
+  roundLeadHours: z.coerce.number().int().min(1, "Draw lead time must be at least 1 hour.").max(168, "Draw lead time can be at most 7 days.").default(24),
 });
 
 export async function createResourceAction(_: FormState, fd: FormData): Promise<FormState> {
@@ -128,9 +134,10 @@ export async function createResourceAction(_: FormState, fd: FormData): Promise<
     requiresIdVerified: fd.get("requiresIdVerified") === "on",
     autoApprove: fd.get("autoApprove") === "on" && !supervision,
     status: "active",
+    qrSecret: newQrSecret(), // printed into the item's QR tag (/resources/[id]/tag)
     createdAt: Date.now(),
   });
-  await audit({ actorId: user.id, action: "resource.listed", entityType: "resource", entityId: id, details: { name: d.name, certs, supervision } });
+  await audit({ actorId: user.id, action: "resource.listed", entityType: "resource", entityId: id, details: { name: d.name, certs, supervision, allocationMode: d.allocationMode } });
   revalidatePath("/", "layout");
   redirect(`/resources/${id}?listed=1`);
 }
@@ -217,7 +224,7 @@ const conditionFields = (fd: FormData) => {
 export async function checkOutAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(async () => {
-    await wf.checkOut(user, str(fd, "bookingId"), conditionFields(fd));
+    await wf.checkOut(user, str(fd, "bookingId"), conditionFields(fd), await proofFromForm(fd, str(fd, "bookingId")));
     return "Checked in. Condition at pick-up recorded.";
   });
 }
@@ -225,7 +232,7 @@ export async function checkOutAction(_: FormState, fd: FormData): Promise<FormSt
 export async function returnAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(async () => {
-    await wf.returnResource(user, str(fd, "bookingId"), conditionFields(fd));
+    await wf.returnResource(user, str(fd, "bookingId"), conditionFields(fd), await proofFromForm(fd, str(fd, "bookingId")));
     return "Return recorded. The owner will inspect and confirm.";
   });
 }
@@ -263,6 +270,7 @@ export async function resolveIncidentAction(_: FormState, fd: FormData): Promise
       resolution: str(fd, "resolution"),
       issueStrike: fd.get("issueStrike") === "on",
       dismiss: str(fd, "outcome") === "dismiss",
+      readBothSides: fd.get("readBothSides") === "on",
     });
     return "Incident closed. Everyone involved has been notified.";
   });

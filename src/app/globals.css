@@ -1,29 +1,154 @@
 @import "tailwindcss";
 
+/* Dark mode follows the resolved theme on <html data-theme="…"> (set before paint by the
+   inline script in layout.tsx), so `dark:` utilities and tokens never disagree. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ==========================================================================
+   LoomLend design tokens
+   Paper & ink, an indigo warp, a saffron weft. Every colour below is a semantic
+   role; components never reach for raw palette values.
+   ========================================================================== */
 :root {
-  --paper: #f7f4ee;
-  --card: #fffdf9;
-  --ink: #1f1d2b;
-  --muted: #6b6878;
-  --line: #e4ded3;
-  --thread: #4338ca; /* indigo warp */
-  --thread-soft: #e0e7ff;
-  --saffron: #c2410c; /* weft */
+  color-scheme: light;
+
+  /* Surfaces */
+  --paper: #f6f2ea; /* page background, warm unbleached paper */
+  --card: #fffdf8; /* default raised surface */
+  --sunken: #efe9de; /* wells, tracks, inputs on cards */
+  --raised: #ffffff; /* popovers, dialogs, toasts */
+  --field: #ffffff; /* form fields */
+  --overlay: rgb(28 26 39 / 0.42);
+
+  /* Ink */
+  --ink: #1c1a27;
+  --muted: #625e70; /* 5.6:1 on paper */
+  --subtle: #8a8597; /* decorative only, never body text */
+  --line: #e4dccd;
+  --line-strong: #cfc4b0;
+
+  /* Brand threads */
+  --thread: #4338ca; /* indigo warp: primary accent, links */
+  --thread-solid: #4338ca; /* fill behind white text */
+  --thread-hover: #3730a3;
+  --thread-soft: #e6e7ff;
+  --saffron: #c2410c; /* weft: highlights, kickers, unread */
+  --saffron-solid: #c2410c;
   --saffron-soft: #ffedd5;
-  --teal: #0f766e;
-  --teal-soft: #ccfbf1;
-  --rose: #be123c;
+
+  /* Status */
+  --teal: #0f766e; /* success */
+  --teal-solid: #0f766e;
+  --teal-soft: #d7f4ec;
+  --rose: #be123c; /* danger */
+  --rose-solid: #be123c;
   --rose-soft: #ffe4e6;
+  --amber: #b45309; /* warning */
+  --amber-ink: #92400e;
   --amber-soft: #fef3c7;
+  --sky: #0369a1; /* info */
+  --sky-soft: #e0f2fe;
+
+  /* Elevation: warm, low-spread shadows that read as paper lifting off a desk */
+  --shadow-1: 0 1px 0 rgb(28 26 39 / 0.04), 0 1px 2px rgb(28 26 39 / 0.06);
+  --shadow-2: 0 1px 2px rgb(28 26 39 / 0.06), 0 6px 16px -4px rgb(60 40 20 / 0.12);
+  --shadow-3: 0 2px 6px rgb(28 26 39 / 0.08), 0 24px 48px -12px rgb(60 40 20 / 0.28);
+  --ring: 0 0 0 3px rgb(67 56 202 / 0.28);
+
+  /* Motion */
+  --dur-instant: 90ms;
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+  --dur-story: 900ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Layout */
+  --header-h: 60px;
+  --tabbar-h: 0px; /* becomes 68px when the phone tab bar is on the page */
+}
+:root:has(nav[data-tabbar]) {
+  --tabbar-h: 68px;
+}
+@media (min-width: 48rem) {
+  :root:has(nav[data-tabbar]) {
+    --tabbar-h: 0px;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #13121a;
+  --card: #1b1a24;
+  --sunken: #17161f;
+  --raised: #24222f;
+  --field: #1f1d29;
+  --overlay: rgb(5 4 10 / 0.62);
+
+  --ink: #ece8df;
+  --muted: #a6a1b4;
+  --subtle: #6f6a7e;
+  --line: #2d2a39;
+  --line-strong: #3e3a4d;
+
+  --thread: #9da0ff;
+  --thread-solid: #5352d6;
+  --thread-hover: #6463e6;
+  --thread-soft: #262447;
+  --saffron: #fb923c;
+  --saffron-solid: #c2410c;
+  --saffron-soft: #3a2014;
+
+  --teal: #5eead4;
+  --teal-solid: #0f766e;
+  --teal-soft: #10302c;
+  --rose: #fb7185;
+  --rose-solid: #e11d48;
+  --rose-soft: #3b1621;
+  --amber: #fbbf24;
+  --amber-ink: #fcd34d;
+  --amber-soft: #3a2a0e;
+  --sky: #7dd3fc;
+  --sky-soft: #0f2a3b;
+
+  --shadow-1: 0 1px 0 rgb(0 0 0 / 0.3);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -6px rgb(0 0 0 / 0.5);
+  --shadow-3: 0 2px 6px rgb(0 0 0 / 0.5), 0 24px 56px -12px rgb(0 0 0 / 0.7);
+  --ring: 0 0 0 3px rgb(157 160 255 / 0.35);
+
+  /* Raw Tailwind palette steps used by pages for "soft fill / strong text" pairs:
+     flip them so those pairs stay legible on the night loom. */
+  --color-zinc-100: #2a2833;
+  --color-zinc-600: #b5b1c0;
+  --color-zinc-700: #cfcbd8;
+  --color-amber-200: #5a4214;
+  --color-amber-900: #fcd34d;
+  --color-indigo-200: #3a3a7a;
+  --color-teal-200: #1d5049;
+  --color-rose-200: #5c2030;
+  --color-sky-100: #0f2a3b;
+  --color-sky-800: #7dd3fc;
+  --color-indigo-800: #6463e6;
+  --color-teal-800: #11857c;
+  --color-rose-800: #f43f5e;
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-card: var(--card);
+  --color-sunken: var(--sunken);
+  --color-raised: var(--raised);
+  --color-field: var(--field);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-thread: var(--thread);
+  --color-thread-solid: var(--thread-solid);
   --color-thread-soft: var(--thread-soft);
   --color-saffron: var(--saffron);
   --color-saffron-soft: var(--saffron-soft);
@@ -31,50 +156,604 @@
   --color-teal-soft: var(--teal-soft);
   --color-rose: var(--rose);
   --color-rose-soft: var(--rose-soft);
+  --color-amber: var(--amber);
+  --color-amber-ink: var(--amber-ink);
   --color-amber-soft: var(--amber-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  /* Semantic aliases */
+  --color-accent: var(--thread);
+  --color-success: var(--teal);
+  --color-warning: var(--amber);
+  --color-danger: var(--rose);
+  --color-info: var(--sky);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-fraunces);
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-spring: var(--ease-spring);
 }
 
+/* In dark mode the brand colours are tuned for text; solid fills behind white text use the
+   deeper "-solid" step so both stay AA. Unlayered, so these win over the utilities. */
+[data-theme="dark"] .bg-thread {
+  background-color: var(--thread-solid);
+}
+[data-theme="dark"] .bg-rose {
+  background-color: var(--rose-solid);
+}
+[data-theme="dark"] .bg-teal {
+  background-color: var(--teal-solid);
+}
+[data-theme="dark"] .bg-saffron {
+  background-color: var(--saffron-solid);
+}
+[data-theme="dark"] .bg-white {
+  background-color: var(--field);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: calc(var(--header-h) + 16px);
+}
 body {
+  overflow-x: clip; /* nothing (e.g. an edge tooltip) may cause sideways scroll on phones */
   background: var(--paper);
   color: var(--ink);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: color-mix(in oklab, var(--saffron) 28%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--thread);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+/* Theme switches shouldn't animate every colour on the page. */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
 }
 
+@layer components {
 /* A faint woven texture: warp and weft lines. */
 .weave {
   background-image:
-    repeating-linear-gradient(90deg, rgb(67 56 202 / 0.07) 0 1px, transparent 1px 14px),
-    repeating-linear-gradient(0deg, rgb(194 65 12 / 0.06) 0 1px, transparent 1px 14px);
+    repeating-linear-gradient(90deg, color-mix(in oklab, var(--thread) 9%, transparent) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(0deg, color-mix(in oklab, var(--saffron) 7%, transparent) 0 1px, transparent 1px 14px);
 }
 
 .card {
   @apply rounded-xl border border-line bg-card;
+  box-shadow: var(--shadow-1);
+}
+/* Cards that are links lift slightly. */
+a.card,
+button.card {
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+a.card:hover,
+button.card:hover {
+  border-color: color-mix(in oklab, var(--thread) 45%, var(--line));
+  box-shadow: var(--shadow-2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  a.card:hover,
+  button.card:hover {
+    transform: translateY(-1px);
+  }
+  a.card:active,
+  button.card:active {
+    transform: translateY(0) scale(0.995);
+  }
+}
 }
 
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-thread;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-thread;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-instant) var(--ease-out);
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 }
 @utility btn-primary {
-  @apply btn bg-thread text-white hover:bg-indigo-800;
+  @apply btn text-white;
+  background-color: var(--thread-solid);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 1px 2px rgb(30 27 75 / 0.25);
+  &:hover:not(:disabled) {
+    background-color: var(--thread-hover);
+  }
 }
 @utility btn-ghost {
-  @apply btn border border-line bg-card text-ink hover:bg-paper;
+  @apply btn border border-line bg-card text-ink;
+  box-shadow: var(--shadow-1);
+  &:hover:not(:disabled) {
+    background-color: var(--sunken);
+    border-color: var(--line-strong);
+  }
+}
+@utility btn-subtle {
+  @apply btn text-ink;
+  &:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--ink) 6%, transparent);
+  }
 }
 @utility btn-danger {
-  @apply btn bg-rose text-white hover:bg-rose-800;
+  @apply btn text-white;
+  background-color: var(--rose-solid);
+  &:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--rose-solid) 85%, black);
+  }
 }
 @utility btn-ok {
-  @apply btn bg-teal text-white hover:bg-teal-800;
+  @apply btn text-white;
+  background-color: var(--teal-solid);
+  &:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--teal-solid) 85%, black);
+  }
+}
+@utility btn-sm {
+  @apply min-h-8 rounded-md px-2.5 py-1 text-xs;
+}
+@utility btn-icon {
+  @apply btn size-10 p-0;
+  @media (pointer: coarse) {
+    width: 44px;
+    height: 44px;
+  }
 }
 
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+@layer components {
 .input {
-  @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-thread focus:outline-2 focus:outline-thread-soft;
+  @apply w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-subtle;
+  background-color: var(--field);
+  min-height: 2.5rem;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.input:hover {
+  border-color: var(--line-strong);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--thread);
+  box-shadow: var(--ring);
+}
+.input:user-invalid {
+  border-color: var(--rose);
+}
+.input:user-invalid:focus {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rose) 28%, transparent);
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: 44px;
+    font-size: 16px; /* stops iOS zooming into fields */
+  }
+}
+select.input {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238a8597' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
 }
 .label {
-  @apply mb-1 block text-xs font-semibold tracking-wide text-muted uppercase;
+  @apply mb-1.5 block text-xs font-semibold tracking-wide text-muted uppercase;
 }
 .h-display {
   font-family: var(--font-display), Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+}
+
+/* ==========================================================================
+   Motion
+   ========================================================================== */
+@keyframes ll-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ll-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ll-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ll-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes ll-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ll-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--saffron) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@keyframes ll-status {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes ll-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility enter {
+  animation: ll-rise var(--dur-slow) var(--ease-out) both;
+}
+@utility pop {
+  animation: ll-pop var(--dur-base) var(--ease-out) both;
+}
+@utility status-in {
+  animation: ll-status var(--dur-slow) var(--ease-spring) both;
+}
+@utility pulse-ring {
+  animation: ll-pulse-ring 1.6s var(--ease-out) infinite;
+}
+@utility spin {
+  animation: ll-spin 0.8s linear infinite;
+}
+
+/* Children enter one after another (cap the delay so long lists don't drag). */
+.stagger > * {
+  animation: ll-rise var(--dur-slow) var(--ease-out) both;
+}
+.stagger > :nth-child(2) { animation-delay: 30ms; }
+.stagger > :nth-child(3) { animation-delay: 60ms; }
+.stagger > :nth-child(4) { animation-delay: 90ms; }
+.stagger > :nth-child(5) { animation-delay: 120ms; }
+.stagger > :nth-child(6) { animation-delay: 150ms; }
+.stagger > :nth-child(7) { animation-delay: 180ms; }
+.stagger > :nth-child(8) { animation-delay: 210ms; }
+.stagger > :nth-child(n + 9) { animation-delay: 240ms; }
+
+.skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--sunken) 0%, color-mix(in oklab, var(--sunken) 55%, var(--card)) 50%, var(--sunken) 100%);
+  background-size: 200% 100%;
+  animation: ll-shimmer 1.4s linear infinite;
+}
+
+/* Route transitions (React <ViewTransition> in app/template.tsx). */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.ll-page) {
+  animation: var(--dur-fast) var(--ease-in) both ll-page-out;
+}
+::view-transition-new(.ll-page) {
+  animation: var(--dur-slow) var(--ease-out) var(--dur-instant) both ll-page-in;
+}
+@keyframes ll-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes ll-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Header and tab bar stay put while content moves. */
+::view-transition-group(ll-header),
+::view-transition-group(ll-tabbar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(ll-header),
+::view-transition-old(ll-tabbar) {
+  display: none;
+}
+::view-transition-new(ll-header),
+::view-transition-new(ll-tabbar) {
+  animation: none;
+}
+
+/* Tooltips: pure CSS, shown on hover and keyboard focus. */
+.tip {
+  position: relative;
+}
+.tip > [role="tooltip"] {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 60;
+  width: max-content;
+  max-width: 16rem;
+  translate: -50% 2px;
+  opacity: 0;
+  border-radius: 0.5rem;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  font-weight: 500;
+  text-align: center;
+  white-space: normal;
+  box-shadow: var(--shadow-2);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    translate var(--dur-fast) var(--ease-out);
+}
+.tip[data-side="bottom"] > [role="tooltip"] {
+  bottom: auto;
+  top: calc(100% + 8px);
+  translate: -50% -2px;
+}
+.tip:hover > [role="tooltip"],
+.tip:focus-within > [role="tooltip"] {
+  opacity: 1;
+  translate: -50% 0;
+  transition-delay: 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Print: a booking or history page should print as a clean record.
+   ========================================================================== */
+@media print {
+  :root {
+    --paper: #fff;
+    --card: #fff;
+    --shadow-1: none;
+    --shadow-2: none;
+  }
+  .no-print,
+  header[data-site-header],
+  nav[data-tabbar],
+  footer,
+  #ll-toaster {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #555;
+  }
+}
+
+/* ==========================================================================
+   Celebration strands and the animated logo mark
+   ========================================================================== */
+.ll-strand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  animation: ll-strand var(--dur-story) var(--ease-out) both;
+}
+@keyframes ll-strand {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0) scale(0.4);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ll-celebrate {
+    display: none;
+  }
+}
+
+.ll-mark-animated .ll-mark-thread,
+.ll-mark-animated .ll-mark-upright,
+.ll-mark-animated .ll-mark-warp {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ll-draw 900ms var(--ease-in-out) forwards;
+}
+.ll-mark-animated .ll-mark-warp {
+  animation-delay: 500ms;
+}
+.ll-mark-animated .ll-mark-upright {
+  animation-duration: 500ms;
+}
+
+/* Empty-state illustrations draw their thread in once. */
+.ll-illus-draw {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: ll-draw 1.2s var(--ease-in-out) 150ms forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ll-illus-draw {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Native dialog entrance. */
+dialog.ll-dialog[open] {
+  animation: ll-pop var(--dur-base) var(--ease-out);
+}
+dialog.ll-dialog[open]::backdrop {
+  animation: ll-fade var(--dur-base) var(--ease-out);
+}
+
+/* Bottom sheet (mobile "More"). */
+dialog.ll-sheet[open] {
+  animation: ll-sheet-up var(--dur-slow) var(--ease-out);
+}
+dialog.ll-sheet[open]::backdrop {
+  animation: ll-fade var(--dur-base) var(--ease-out);
+}
+@keyframes ll-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* Route progress: a thread pulled across the top edge. */
+.ll-progress {
+  background: linear-gradient(90deg, var(--thread), var(--saffron));
+  box-shadow: 0 0 10px color-mix(in oklab, var(--thread) 50%, transparent);
+  transform: scaleX(0);
+}
+.ll-progress-run {
+  animation: ll-progress-run 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+.ll-progress-done {
+  transform: scaleX(1);
+  opacity: 0;
+  transition:
+    transform 200ms var(--ease-out),
+    opacity 300ms ease 150ms;
+}
+@keyframes ll-progress-run {
+  0% {
+    transform: scaleX(0);
+  }
+  10% {
+    transform: scaleX(0.3);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
+}
+
+/* Landing hero loom: wefts are shuttled in one by one; tags settle onto them. */
+.ll-weft {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ll-draw 1100ms var(--ease-in-out) var(--d, 0ms) forwards;
+}
+.ll-shuttle {
+  animation: ll-shuttle 2.4s var(--ease-in-out) infinite alternate;
+}
+@keyframes ll-shuttle {
+  from {
+    transform: translateX(40px);
+  }
+  to {
+    transform: translateX(480px);
+  }
+}
+.ll-weave-tag {
+  animation: ll-pop var(--dur-slow) var(--ease-spring) var(--d, 0ms) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ll-weft {
+    stroke-dashoffset: 0;
+  }
+  .ll-shuttle {
+    animation: none;
+    transform: translateX(260px);
+  }
+}
+
+/* Grid items default to min-width:auto, which lets one nowrap button push a single-column
+   phone layout wider than the screen. Let them shrink instead. */
+.grid > * {
+  min-width: 0;
 }

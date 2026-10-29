@@ -3,6 +3,7 @@
 import type { Booking, Certification, Resource, User } from "@/db/schema";
 import { AFFILIATIONS, BOOKING_HORIZON_DAYS, CERTS, MAX_OPEN_REQUESTS, STRIKE_LIMIT } from "./catalog";
 import { DAY, DAY_NAMES, HOUR, campusDayAt, campusParts } from "./time";
+import { CREDIT_POINTS, MAX_CREDITS } from "./lottery";
 
 export type Check = { key: string; label: string; pass: boolean; detail: string; fixHint?: string };
 export type Eligibility = { eligible: boolean; checks: Check[]; needsSupervision: boolean };
@@ -158,6 +159,7 @@ export function priorityScore(
   user: Pick<User, "strikes">,
   history: Booking[], // the requester's past bookings
   now = Date.now(),
+  fairnessCredits = 0, // earned by missing out in earlier draws on this resource
 ): { score: number; factors: PriorityFactor[] } {
   const factors: PriorityFactor[] = [{ label: "Base", points: 50 }];
   const purposePts = { coursework: 20, research: 15, project: 10, personal: 0 }[booking.purposeType];
@@ -174,7 +176,19 @@ export function priorityScore(
   if (noShows) factors.push({ label: `No-shows: ${noShows}`, points: -5 * noShows });
   if (user.strikes) factors.push({ label: `Strikes: ${user.strikes}`, points: -10 * user.strikes });
 
+  const credits = Math.min(MAX_CREDITS, Math.max(0, Math.floor(fairnessCredits)));
+  if (credits) factors.push({ label: `Fairness credits: ${credits} (missed out in earlier draws)`, points: CREDIT_POINTS * credits });
+
   return { score: factors.reduce((s, f) => s + f.points, 0), factors };
+}
+
+/**
+ * Allocation rounds: requests for a campus day join that day's draw until `closesAt`
+ * (campus midnight of the day minus the owner's lead time).
+ */
+export function roundTiming(resource: Pick<Resource, "roundLeadHours">, start: number) {
+  const dayStart = campusDayAt(start, 0);
+  return { dayStart, closesAt: dayStart - resource.roundLeadHours * HOUR };
 }
 
 export function eligibilitySummary(e: Eligibility) {
