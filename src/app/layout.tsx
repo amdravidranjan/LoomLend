@@ -51,6 +51,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       data-theme={theme}
       data-theme-pref={pref ?? "system"}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>

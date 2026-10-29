@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icons";
 import { Kbd } from "./primitives";
 import { navItems, type NavRole } from "./nav-items";
@@ -22,17 +22,17 @@ export function Shortcuts({ role }: { role: NavRole }) {
   const [open, setOpen] = useState(false);
   const [chord, setChord] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
-  const items = navItems(role).filter((i) => i.key);
+  const items = useMemo(() => navItems(role).filter((i) => i.key), [role]);
+  const gAt = useRef(0);
 
   useEffect(() => {
-    let gAt = 0;
     let timer = 0;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
       if (document.querySelector("dialog[open]") && e.key !== "?") return;
       const k = e.key.toLowerCase();
-      if (Date.now() - gAt < 1200) {
-        gAt = 0;
+      if (Date.now() - gAt.current < 1200) {
+        gAt.current = 0;
         setChord(false);
         const dest = items.find((i) => i.key === k);
         if (dest) {
@@ -42,7 +42,7 @@ export function Shortcuts({ role }: { role: NavRole }) {
         return;
       }
       if (k === "g") {
-        gAt = Date.now();
+        gAt.current = Date.now();
         setChord(true);
         window.clearTimeout(timer);
         timer = window.setTimeout(() => setChord(false), 1200);

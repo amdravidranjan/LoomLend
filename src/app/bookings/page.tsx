@@ -31,15 +31,13 @@ function BookingRow({ b, r, now, cta }: Row & { now: number; cta?: { href: strin
           {showCountdown && (
             <span className="inline-flex items-center gap-1 rounded-full bg-thread-soft px-2 py-px text-xs font-medium text-thread">
               <Icon name="hourglass" size={12} />
-              {future ? "Starts " : "Started "}
-              <RelativeTime ms={b.start} now={now} style="countdown" />
+              <RelativeTime ms={b.start} now={now} style="countdown" prefix={future ? "Starts " : "Started "} />
             </span>
           )}
           {b.status === "checked_out" && (
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-px text-xs font-medium ${overdue ? "bg-rose-soft text-rose" : "bg-saffron-soft text-saffron"}`}>
               <Icon name="clock" size={12} />
-              {overdue ? "Was due " : "Due "}
-              <RelativeTime ms={b.end} now={now} style="countdown" />
+              <RelativeTime ms={b.end} now={now} style="countdown" prefix={overdue ? "Was due " : "Due "} />
             </span>
           )}
         </p>

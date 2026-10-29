@@ -9,6 +9,7 @@ import { ThemeToggle } from "./ds/client";
 import { CommandPalette } from "./ds/command-palette";
 import { Shortcuts } from "./ds/shortcuts";
 import type { NavRole } from "./ds/nav-items";
+import { AssistantLauncher } from "./assistant-launcher";
 
 /**
  * Site header (desktop: primary links + More, search, bell, account menu) and, for signed-in
@@ -31,6 +32,11 @@ export async function Nav() {
           </Link>
           <MainNav role={role} />
           <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+            {user && (
+              <span className="mr-1 hidden xl:inline-flex">
+                <AssistantLauncher className="whitespace-nowrap" />
+              </span>
+            )}
             <SearchTrigger />
             {user ? (
               <>

@@ -83,7 +83,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   const hour = campusParts(now).hour;
   const first = user.name.replace(/^Dr\.\s+/, "").split(" ")[0];
-  const upcoming = mine.filter(({ b }) => b.id !== next?.b.id);
+  const upcoming = mine.filter(({ b }) => b.id !== next?.b.id && (b.end > now || b.status === "checked_out" || b.status === "returned"));
 
   return (
     <div className="space-y-6">
@@ -119,19 +119,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <div className="space-y-6">
-          {next ? <NextBooking b={next.b} r={next.r} now={now} /> : (
-            <div className="card enter p-2">
-              <EmptyState
-                illustration="spool"
-                title="Nothing on your loom yet"
-                description="Describe what you want to make and LoomLend shows what you can book, and why."
-                action={<Link href="/resources" className="btn-primary">Discover resources</Link>}
-                secondary={<Link href="/assistant" className="btn-ghost"><Icon name="sparkle" size={16} />Ask the concierge</Link>}
-                className="border-0"
-              />
-            </div>
-          )}
-
           {staffCounts && (
             <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -151,6 +138,19 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <span className="text-sm text-muted">{s.label}</span>
                 </Link>
               ))}
+            </div>
+          )}
+          {next ? <NextBooking b={next.b} r={next.r} now={now} /> : (
+            <div className="card enter p-2">
+              <EmptyState
+                compact={!!staffCounts}
+                illustration="spool"
+                title="Nothing on your loom yet"
+                description="Describe what you want to make and LoomLend shows what you can book, and why."
+                action={<Link href="/resources" className="btn-primary">Discover resources</Link>}
+                secondary={<Link href="/assistant" className="btn-ghost"><Icon name="sparkle" size={16} />Ask the concierge</Link>}
+                className="border-0"
+              />
             </div>
           )}
 
@@ -272,8 +272,7 @@ function NextBooking({ b, r, now }: { b: Booking; r: Resource; now: number }) {
           </span>
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${overdue ? "bg-rose-soft text-rose" : "bg-thread-soft text-thread"}`}>
             <Icon name="hourglass" size={13} />
-            {inUse ? (overdue ? "Was due " : "Due back ") : target > now ? "Starts " : "Started "}
-            <RelativeTime ms={target} now={now} style="countdown" />
+            <RelativeTime ms={target} now={now} style="countdown" prefix={inUse ? (overdue ? "Was due " : "Due back ") : target > now ? "Starts " : "Started "} />
           </span>
           <CopyButton value={bookingRef(b.id)} showValue label="Copy booking reference" />
         </div>

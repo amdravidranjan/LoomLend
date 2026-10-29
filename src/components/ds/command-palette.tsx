@@ -143,6 +143,7 @@ export function CommandPalette({ role }: { role: NavRole }) {
       return [...pick, ...entries.filter((e) => e.id === "c:keys" || e.id === "c:dark" || e.id === "c:light")];
     }
     return entries
+      .filter((e) => e.id !== "c:search")
       .map((e) => ({ e, s: Math.max(fuzzyScore(q, e.label) * 2, fuzzyScore(q, e.keywords)) }))
       .filter((x) => x.s >= 0)
       .sort((a, b) => b.s - a.s)
@@ -199,7 +200,7 @@ export function CommandPalette({ role }: { role: NavRole }) {
                 setSel(0);
               }}
               placeholder="Search pages, resources, bookings…"
-              className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-subtle"
+              className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-subtle focus-visible:outline-none"
               role="combobox"
               aria-expanded
               aria-controls="ll-palette-list"

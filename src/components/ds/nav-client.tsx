@@ -88,6 +88,7 @@ function MenuLink({ href, icon, children, hint, onClick }: { href: string; icon:
 export function MainNav({ role }: { role: NavRole }) {
   const pathname = usePathname();
   const items = navItems(role);
+  // On wide screens "Ask" becomes the AssistantLauncher pill on the right of the header.
   const primary = items.filter((i) => i.place === "primary");
   const more = items.filter((i) => i.place === "more");
   const moreActive = more.some((i) => isActive(pathname, i.href));
@@ -100,13 +101,13 @@ export function MainNav({ role }: { role: NavRole }) {
             key={l.href}
             href={l.href}
             aria-current={active ? "page" : undefined}
-            className={`relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm whitespace-nowrap transition-colors lg:px-3 ${
+            className={`relative flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm whitespace-nowrap transition-colors lg:px-3 ${l.href === "/assistant" ? "xl:hidden" : ""} ${
               active ? "font-medium text-ink" : "text-ink/70 hover:bg-sunken hover:text-ink"
             }`}
           >
-            <Icon name={l.icon} size={16} className={active ? "text-thread" : "opacity-70"} />
+            <Icon name={l.icon} size={16} className={`hidden lg:block ${active ? "text-thread" : "opacity-70"}`} />
             {l.label}
-            {active && <span className="absolute inset-x-2.5 -bottom-[13px] h-0.5 rounded-full bg-thread lg:inset-x-3" aria-hidden />}
+            {active && <span className="absolute inset-x-2 -bottom-[13px] h-0.5 rounded-full bg-thread lg:inset-x-3" aria-hidden />}
           </Link>
         );
       })}
@@ -138,13 +139,13 @@ export function SearchTrigger() {
     <button
       type="button"
       onClick={() => openPalette()}
-      className="group flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-sm text-muted shadow-1 transition-colors hover:border-line-strong hover:text-ink max-lg:size-10 max-lg:justify-center max-lg:border-transparent max-lg:bg-transparent max-lg:px-0 max-lg:shadow-none"
+      className="group flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-sm text-muted shadow-1 transition-colors hover:border-line-strong hover:text-ink max-xl:size-10 max-xl:justify-center max-xl:border-transparent max-xl:bg-transparent max-xl:px-0 max-xl:shadow-none"
       aria-label="Search and jump to (Ctrl K)"
       aria-keyshortcuts="Control+K Meta+K"
     >
       <Icon name="search" size={16} />
-      <span className="hidden lg:inline">Search…</span>
-      <span className="ml-3 hidden items-center gap-0.5 lg:flex">
+      <span className="hidden xl:inline">Search…</span>
+      <span className="ml-3 hidden items-center gap-0.5 xl:flex">
         <Kbd>Ctrl</Kbd>
         <Kbd>K</Kbd>
       </span>
