@@ -757,3 +757,33 @@ dialog.ll-sheet[open]::backdrop {
 .grid > * {
   min-width: 0;
 }
+
+/* Demo guide: highlight rings around the next control (components/demo-guide.tsx). */
+.guide-ring {
+  box-shadow: 0 0 0 2px var(--color-thread), 0 0 0 6px color-mix(in oklab, var(--color-thread) 22%, transparent);
+  transition: top 0.15s, left 0.15s, width 0.15s, height 0.15s;
+}
+.guide-ring-primary {
+  box-shadow: 0 0 0 3px var(--color-saffron), 0 0 0 8px color-mix(in oklab, var(--color-saffron) 25%, transparent);
+  animation: guide-breathe 1.8s ease-in-out infinite;
+}
+.guide-ring-idle {
+  animation-duration: 0.9s;
+}
+.guide-pulse {
+  animation: guide-breathe 1s ease-in-out infinite;
+}
+@keyframes guide-breathe {
+  50% {
+    transform: scale(1.03);
+    filter: brightness(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-ring,
+  .guide-ring-primary,
+  .guide-pulse {
+    animation: none;
+    transition: none;
+  }
+}

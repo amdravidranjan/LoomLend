@@ -48,7 +48,8 @@ Open the deployed link, click **Try a demo account** and pick a person. All demo
 | Vikram Shah | External founder, ID unverified | See which resources are locked and why |
 | Farhan Ali | Student with 1 strike | See a waiting-list position and its explanation |
 
-**Five-minute path:**
+**Five-minute path:** the **Demo guide** panel (bottom-left of every page) walks judges through these steps: it signs you in as each person, highlights the next control, advances on its own, and nudges after 15 seconds without a click.
+
 1. **Priya** → **Ask**: "I need to debug a circuit with an oscilloscope tomorrow afternoon" → **Request this slot** → send.
 2. **Rahul** approves it.
 3. **Priya** opens the booking → **Simulate scanning the tag (demo)** → check in → return it in "Fair" condition. A damage report opens automatically.

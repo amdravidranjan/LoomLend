@@ -10,6 +10,9 @@ import { Toaster } from "@/components/ds/toast";
 import { ConfirmHost } from "@/components/ds/confirm-dialog";
 import { PageTransition, RouteProgress } from "@/components/ds/route-progress";
 import { THEME_SCRIPT } from "@/components/ds/theme-script";
+import { DemoGuide } from "@/components/demo-guide";
+import { getCurrentUser } from "@/lib/auth";
+import { demoMode } from "@/lib/workflow";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -45,6 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // theme straight away; "system" is resolved by the inline script before first paint.
   const pref = (await cookies()).get("ll-theme")?.value;
   const theme = pref === "dark" || pref === "light" ? pref : undefined;
+  const user = demoMode() ? await getCurrentUser() : null;
   return (
     <html
       lang="en-IN"
@@ -94,6 +98,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </footer>
         <Toaster />
         <ConfirmHost />
+        {demoMode() && <DemoGuide userId={user?.id ?? null} />}
       </body>
     </html>
   );

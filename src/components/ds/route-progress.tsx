@@ -45,7 +45,7 @@ export function RouteProgress() {
     };
     const onSubmit = (e: SubmitEvent) => {
       const f = e.target as HTMLFormElement;
-      if ((f.method || "get").toLowerCase() === "get" && !e.defaultPrevented) start();
+      if ((f.getAttribute("method") || "get").toLowerCase() === "get" && !e.defaultPrevented) start();
     };
     document.addEventListener("click", onClick);
     document.addEventListener("submit", onSubmit);
